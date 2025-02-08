@@ -8,7 +8,7 @@
 
 import CryptoSwift
 import Foundation
-import secp256k1
+import secp256k1talk
 #if os(Linux)
 import Glibc
 #endif

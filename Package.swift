@@ -1,4 +1,4 @@
-// swift-tools-version:5.10
+// swift-tools-version:5.7.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -46,7 +46,7 @@ let package = Package(
             dependencies: [
                 .product(name: "WebSocketKit", package: "websocket-kit"),
                 .product(name: "NIO", package: "swift-nio"),
-                .product(name: "secp256k1", package: "secp256k1.swift"),
+                .product(name: "secp256k1", package: "secp256k1.swift", moduleAliases: ["secp256k1":"secp256k1talk"]),
                 "AnyCodable",
                 "CryptoSwift",
                 "BigInt"

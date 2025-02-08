@@ -7,7 +7,7 @@
 
 import BigInt
 import Foundation
-import secp256k1
+import secp256k1talk
 
 // swiftlint:disable all
 
