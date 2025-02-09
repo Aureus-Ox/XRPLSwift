@@ -42,7 +42,7 @@ public class BinaryCodec {
      - returns:
      The binary-encoded object, as a hexadecimal string.
      */
-    class func encode(_ data: Data) throws -> String {
+    public class func encode(_ data: Data) throws -> String {
         let jsonResult = try JSONSerialization.jsonObject(with: data, options: .mutableLeaves)
         return try serializeJson(jsonResult as! [String: Any])
     }
@@ -54,7 +54,7 @@ public class BinaryCodec {
      - returns:
      The binary-encoded transaction, ready to be signed.
      */
-    class func encodeForSigning(_ json: [String: Any]) throws -> String {
+    public class func encodeForSigning(_ json: [String: Any]) throws -> String {
         return try serializeJson(
             json,
             TRANSACTION_SIGNATURE_PREFIX,
