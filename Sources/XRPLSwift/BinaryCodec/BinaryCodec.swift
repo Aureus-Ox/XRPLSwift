@@ -23,7 +23,7 @@ let TRANSACTION_MULTISIG_PREFIX = Data(numToBytes(num: 0x534D5400).bytes.reverse
 /**
  Functions to encode/decode to/from the ripple binary serialization format
  */
-class BinaryCodec {
+public class BinaryCodec {
     /**
      Encode a transaction or other object into the canonical binary format.
      - parameters:

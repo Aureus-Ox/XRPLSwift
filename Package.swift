@@ -27,7 +27,7 @@ let package = Package(
         .package(url: "https://github.com/Flight-School/AnyCodable.git", from: "0.4.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.24.0"),
         .package(url: "https://github.com/vapor/websocket-kit.git", from: "2.6.1"),
-        .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "<version>")
+        .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.58.0")
     ],
     targets: [
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
@@ -42,7 +42,7 @@ let package = Package(
                 "BigInt"
             ],
             plugins: [
-//                .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
+                .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
             ]
         ),
         .testTarget(
