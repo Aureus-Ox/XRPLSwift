@@ -125,7 +125,7 @@ internal class SECP256K1: SigningAlgorithm {
         var _data = Data(sha512HalfHash(data: message))
 
         if secp256k1_ecdsa_sign(ctx!, &sig, _data.getPointer(), _privateKey.getPointer(), secp256k1_nonce_function_rfc6979, nil) == 0 {
-            secp256k1_context_destroy(ctx)
+            secp256k1_context_destroy(ctx!)
             throw SigningError.invalidPrivateKey
         }
 
@@ -136,10 +136,10 @@ internal class SECP256K1: SigningAlgorithm {
         var tmp: [UInt8] = Array(repeating: 0, count: 72)
         var size = tmp.count
         if secp256k1_ecdsa_signature_serialize_der(ctx!, &tmp[0], &size, &sig) == 0 {
-            secp256k1_context_destroy(ctx)
+            secp256k1_context_destroy(ctx!)
             throw SigningError.invalidSignature
         }
-        secp256k1_context_destroy(ctx)
+        secp256k1_context_destroy(ctx!)
         return [UInt8](tmp.prefix(through: size-1))
     }
 
@@ -152,7 +152,7 @@ internal class SECP256K1: SigningAlgorithm {
         var _msgDigest = Data(sha512HalfHash(data: message))
 
         if secp256k1_ecdsa_signature_parse_der(ctx!, &sig, _signatureData.getPointer(), _signatureData.count) == 0 {
-            secp256k1_context_destroy(ctx)
+            secp256k1_context_destroy(ctx!)
             throw SigningError.invalidSignature
         }
 
@@ -171,7 +171,7 @@ internal class SECP256K1: SigningAlgorithm {
         //        _ = _pubKeyData.getPointer()
 
         if resultParsePublicKey == 0 {
-            secp256k1_context_destroy(ctx)
+            secp256k1_context_destroy(ctx!)
             throw SigningError.invalidPublicKey
         }
 
@@ -180,7 +180,7 @@ internal class SECP256K1: SigningAlgorithm {
         // TODO: IDK WHY I HAVE TO DO THIS
         //        _ = _msgDigest.getPointer()
 
-        secp256k1_context_destroy(ctx)
+        secp256k1_context_destroy(ctx!)
 
         if result == 1 {
             return true
@@ -200,7 +200,7 @@ internal class SECP256K1: SigningAlgorithm {
             _pubKeyData.count
         )
         if resultParsePublicKey == 0 {
-            secp256k1_context_destroy(ctx)
+            secp256k1_context_destroy(ctx!)
             throw SigningError.invalidPublicKey
         }
 

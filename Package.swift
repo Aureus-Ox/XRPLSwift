@@ -1,4 +1,4 @@
-// swift-tools-version:5.5
+// swift-tools-version:5.7.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -21,7 +21,8 @@ let package = Package(
     dependencies: [
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
-        .package(url: "https://github.com/Boilertalk/secp256k1.swift.git", from: "0.1.7"),
+        .package(url: "https://github.com/GigaBitcoin/secp256k1.swift.git", .upToNextMajor(from: "0.6.0")),
+//        .package(url: "https://github.com/Boilertalk/secp256k1.swift.git", from: "0.1.7"),
 //        .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1.git", exact: "0.16.0"),
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.5.1"),
         .package(url: "https://github.com/attaswift/BigInt.git", from: "5.0.0"),
