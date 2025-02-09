@@ -1,4 +1,4 @@
-// swift-tools-version:5.7.1
+// swift-tools-version:5.5
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -22,6 +22,7 @@ let package = Package(
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
         .package(url: "https://github.com/Boilertalk/secp256k1.swift.git", from: "0.1.7"),
+//        .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1.git", exact: "0.16.0"),
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.5.1"),
         .package(url: "https://github.com/attaswift/BigInt.git", from: "5.0.0"),
         .package(url: "https://github.com/Flight-School/AnyCodable.git", from: "0.4.0"),
@@ -46,7 +47,7 @@ let package = Package(
             dependencies: [
                 .product(name: "WebSocketKit", package: "websocket-kit"),
                 .product(name: "NIO", package: "swift-nio"),
-                .product(name: "secp256k1", package: "secp256k1.swift", moduleAliases: ["secp256k1":"secp256k1talk"]),
+                .product(name: "secp256k1", package: "secp256k1.swift"),
                 "AnyCodable",
                 "CryptoSwift",
                 "BigInt"
