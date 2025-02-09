@@ -289,7 +289,7 @@ public class BaseTransaction: Codable {
 }
 
 extension BaseTransaction {
-    func toJson() throws -> [String: AnyObject] {
+    public func toJson() throws -> [String: AnyObject] {
         let data = try JSONEncoder().encode(self)
         let jsonResult = try JSONSerialization.jsonObject(with: data, options: .mutableLeaves)
         return jsonResult as! [String: AnyObject]
