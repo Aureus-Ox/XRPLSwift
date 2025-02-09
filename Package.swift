@@ -22,26 +22,14 @@ let package = Package(
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
         .package(url: "https://github.com/GigaBitcoin/secp256k1.swift.git", .upToNextMajor(from: "0.6.0")),
-//        .package(url: "https://github.com/Boilertalk/secp256k1.swift.git", from: "0.1.7"),
-//        .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1.git", exact: "0.16.0"),
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", from: "1.5.1"),
         .package(url: "https://github.com/attaswift/BigInt.git", from: "5.0.0"),
         .package(url: "https://github.com/Flight-School/AnyCodable.git", from: "0.4.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.24.0"),
-        .package(url: "https://github.com/vapor/websocket-kit.git", from: "2.6.1")
+        .package(url: "https://github.com/vapor/websocket-kit.git", from: "2.6.1"),
+        .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "<version>")
     ],
     targets: [
-        // Targets are the basic building blocks of a package. A target can define a module or a test suite.
-        .binaryTarget(
-            name: "SwiftLintBinary",
-            url: "https://github.com/realm/SwiftLint/releases/download/0.48.0/SwiftLintBinary-macos.artifactbundle.zip",
-            checksum: "9c255e797260054296f9e4e4cd7e1339a15093d75f7c4227b9568d63edddba50"
-        ),
-        .plugin(
-            name: "SwiftLintPlugin",
-            capability: .buildTool(),
-            dependencies: ["SwiftLintBinary"]
-        ),
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .target(
             name: "XRPLSwift",
@@ -53,7 +41,9 @@ let package = Package(
                 "CryptoSwift",
                 "BigInt"
             ],
-            plugins: ["SwiftLintPlugin"]
+            plugins: [
+                .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
+            ]
         ),
         .testTarget(
             name: "XRPLSwiftUTests",
