@@ -8,7 +8,7 @@
 import Foundation
 // swiftlint:disable all
 
-struct RIPEMD160 {
+public struct RIPEMD160 {
 
     private var MDbuf: (UInt32, UInt32, UInt32, UInt32, UInt32)
     private var buffer: Data
@@ -366,7 +366,7 @@ struct RIPEMD160 {
     }
 }
 
-extension RIPEMD160 {
+public extension RIPEMD160 {
 
     static func hash(message: Data) -> Data {
         var md = RIPEMD160()
