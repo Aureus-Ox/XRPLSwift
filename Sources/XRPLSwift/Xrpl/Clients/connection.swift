@@ -511,9 +511,9 @@ public class Connection {
         //        self.ws.removeAllListeners()
 //        connectionTimeoutID.invalidate()
         // Add new, long-term connected listeners for messages and errors
-        self.ws?.onText({ _, message in
-            self.onMessage(message: message)
-        })
+//        self.ws?.onText({ _, message in
+//            self.onMessage(message: message)
+//        })
 
         // TESTING ONLY
         // TODO: This function is only used in the MockRippled Testing Response
