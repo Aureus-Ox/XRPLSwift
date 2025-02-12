@@ -196,8 +196,8 @@ public class XrplClient: ConnectionDelegate {
      * @returns The URL of the server this client is connected to.
      * @category Network
      */
-    func url() -> String {
-        return self.connection.getUrl()
+    func url() async -> String {
+        return await self.connection.getUrl()
     }
 
     /**
@@ -612,8 +612,8 @@ public class XrplClient: ConnectionDelegate {
      * @returns Whether the client instance is connected.
      * @category Network
      */
-    public func isConnected() -> Bool {
-        return self.connection.isConnected()
+    public func isConnected() async -> Bool {
+        return await self.connection.isConnected()
     }
 
     //    public func autofill(transaction: Transaction, signersCount: Int? = 0) async throws -> EventLoopFuture<BaseTransaction> {

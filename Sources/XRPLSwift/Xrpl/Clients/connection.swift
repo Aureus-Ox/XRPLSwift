@@ -202,7 +202,7 @@ public protocol ConnectionDelegate: AnyObject {
  The main Connection class. Responsible for connecting to & managing
  an active WebSocket connection to a XRPL node.
  */
-public class Connection {
+public actor Connection: Sendable {
     var delegate: ConnectionDelegate?
 
     internal var trace: ConsoleLog?
@@ -277,13 +277,6 @@ public class Connection {
         //            promise.fail(XrplError("Websocket connection never cleaned up."))
         //        }
 
-        let connectionTimeoutID = Timer.scheduledTimer(withTimeInterval: TimeInterval(self.config.connectionTimeout), repeats: false) { _ in
-            Task {
-                // swiftlint:disable:next line_length
-                self.onConnectionFailed(errorOrCode: ConnectionError("Error: connect() timed out after \(self.config.connectionTimeout)ms. If your internet connection is working, the rippled server may be blocked or inaccessible. You can also try setting the `connectionTimeout` option in the Client constructor.")
-                )
-            }
-        }
         // Create the connection timeout, in case the connection hangs longer than expected.
         // Connection listeners: these stay attached only until a connection is done/open.
         guard let url = url, let uri = URL(string: url), let isscheme = uri.scheme, let ishost = uri.host else {
@@ -305,30 +298,28 @@ public class Connection {
         }
 
         let client: WebSocketClient = createWebSocket(url: url, config: self.config)!
-        try client.connect(scheme: isscheme, host: ishost, port: port, onUpgrade: { ws -> Void in
-            self.ws = ws
-            self.setHandlers()
-
+        let connectionLoopFuture = client.connect(scheme: isscheme, host: ishost, port: port, onUpgrade: { ws -> Void in
             Task {
-                // TODO: This goes after client.connect in js, but swift doesnt(verify) return the ws. we would .wait
-                // But if we .wait(), then the await connection func is hit after the onceOpen func
-                if self.ws == nil {
+                await self.setWebSocket(ws: ws)
+                await self.setHandlers()
+
+                if await self.ws == nil {
                     throw ConnectionError("Connect: created null websocket")
                 }
 
-                try await self.onceOpen(connectionTimeoutID: connectionTimeoutID)
+                // TODO: This goes after client.connect in js, but swift doesnt(verify) return the ws. we would .wait
+                // But if we .wait(), then the await connection func is hit after the onceOpen func
+                await self.retryConnectionBackoff.reset()
+                await self.startHeartbeatInterval()
+                await self.connectionManager.resolveAllAwaiting()
+
+                NSLog("connected")
             }
         })
 
         //        this.ws.on('error', (error) => this.onConnectionFailed(error))
         //        this.ws.on('error', () => clearTimeout(connectionTimeoutID))
 
-        self.ws?.onClose.whenFailure({ error in
-            self.onConnectionFailed(errorOrCode: error)
-        })
-        self.ws?.onClose.whenSuccess({ _ in
-            connectionTimeoutID.invalidate()
-        })
         return await self.connectionManager.awaitConnection()
     }
 
@@ -496,17 +487,31 @@ public class Connection {
         return self.ws != nil
     }
 
+    private func setWebSocket(ws: WebSocket?) {
+        self.ws = ws
+    }
+    
+    private func socketIsOpen() -> Bool {
+        guard let ws = ws else { return false }
+        
+        if ws.isClosed {
+            return false
+        }
+        
+        return true
+    }
+
     private func setHandlers() {
         // Add new, long-term connected listeners for messages and errors
         self.ws?.onText({ _, message in
-            self.onMessage(message: message)
+            await self.onMessage(message: message)
         })
 
         // TESTING ONLY
         // TODO: This function is only used in the MockRippled Testing Response
         self.ws?.onBinary({ _, message in
             let data = Data(buffer: message)
-            self.onMessage(data: data)
+            await self.onMessage(data: data)
         })
         //        self.ws.on("error", (error) =>
         //            self.emit("error", "websocket", error.message, error),
@@ -515,39 +520,42 @@ public class Connection {
         _ = self.ws?.onClose.map { _ in
             let reason: String = "none"
             let code: Int? = 0
-            if self.ws == nil {
-                NSLog("UNMPLEMENTED")
-                return
-            }
-            self.clearHeartbeatInterval()
-            try? self.requestManager.rejectAll(error: DisconnectedError("websocket was closed, \(reason)"))
-            //            self.ws.removeAllListeners()
-            self.ws = nil
+            
+            Task {
+                if await self.socketIsOpen() {
+                    NSLog("UNMPLEMENTED")
+                    return
+                }
+                await self.clearHeartbeatInterval()
+                try? await self.requestManager.rejectAll(error: DisconnectedError("websocket was closed, \(reason)"))
+                
+                await self.setWebSocket(ws: nil)
 
-            if code == nil {
-                let reasonText = reason
-                // swiftlint:disable:next line_length
-                NSLog("Disconnected but the disconnect code was undefined (The given reason was \(reasonText)). This could be caused by an exception being thrown during a `connect` callback. Disconnecting with code 1011 to indicate an internal error has occurred.")
+                if code == nil {
+                    let reasonText = reason
+                    // swiftlint:disable:next line_length
+                    NSLog("Disconnected but the disconnect code was undefined (The given reason was \(reasonText)). This could be caused by an exception being thrown during a `connect` callback. Disconnecting with code 1011 to indicate an internal error has occurred.")
+
+                    /*
+                     * Error code 1011 represents an Internal Error according to
+                     * https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code
+                     */
+                    let internalErrorCode = 1011
+                    //                self.emit("disconnected", internalErrorCode)
+                    print("disconnected: \(internalErrorCode)")
+                } else {
+                    //                self.emit("disconnected", code)
+                    guard let code = code else { return }
+                    print("disconnected: \(code)")
+                }
 
                 /*
-                 * Error code 1011 represents an Internal Error according to
-                 * https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code
+                 * If this wasn"t a manual disconnect, then lets reconnect ASAP.
+                 * Code can be undefined if there"s an exception while connecting.
                  */
-                let internalErrorCode = 1011
-                //                self.emit("disconnected", internalErrorCode)
-                print("disconnected: \(internalErrorCode)")
-            } else {
-                //                self.emit("disconnected", code)
-                guard let code = code else { return }
-                print("disconnected: \(code)")
-            }
-
-            /*
-             * If this wasn"t a manual disconnect, then lets reconnect ASAP.
-             * Code can be undefined if there"s an exception while connecting.
-             */
-            if code != INTENTIONAL_DISCONNECT_CODE && code != nil {
-                self.intentionalDisconnect()
+                if code != INTENTIONAL_DISCONNECT_CODE && code != nil {
+                    await self.intentionalDisconnect()
+                }
             }
         }
     }

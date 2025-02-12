@@ -26,7 +26,7 @@ let package = Package(
         .package(url: "https://github.com/attaswift/BigInt.git", from: "5.0.0"),
         .package(url: "https://github.com/Flight-School/AnyCodable.git", from: "0.4.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.24.0"),
-        .package(url: "https://github.com/vapor/websocket-kit.git", from: "2.6.1"),
+        .package(url: "https://github.com/vapor/websocket-kit.git", from: "2.15.0"),
 //        .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.58.0")
     ],
     targets: [
