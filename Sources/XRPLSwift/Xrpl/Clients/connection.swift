@@ -313,6 +313,8 @@ public class Connection {
                 if self.ws == nil {
                     throw ConnectionError("Connect: created null websocket")
                 }
+                self.setHandlers()
+
                 try await self.onceOpen(connectionTimeoutID: connectionTimeoutID)
             }
         })
@@ -493,27 +495,11 @@ public class Connection {
         return self.ws != nil
     }
 
-    /**
-     Handler for what to do once the connection to the server is open.
-     - parameters:
-     - connectionTimeoutID: Timeout in case the connection hangs longer than expected.
-     - returns:
-     A promise that resolves to void when the connection is fully established.
-     - throws:
-     Error if the websocket initialized is somehow null.
-     */
-    private func onceOpen(connectionTimeoutID: Timer) async throws {
-        if self.ws == nil {
-            throw ConnectionError("onceOpen: ws is nil")
-        }
-
-        // Once the connection completes successfully, remove all old listeners
-        //        self.ws.removeAllListeners()
-//        connectionTimeoutID.invalidate()
+    private func setHandlers() {
         // Add new, long-term connected listeners for messages and errors
-//        self.ws?.onText({ _, message in
-//            self.onMessage(message: message)
-//        })
+        self.ws?.onText({ _, message in
+            self.onMessage(message: message)
+        })
 
         // TESTING ONLY
         // TODO: This function is only used in the MockRippled Testing Response
@@ -563,12 +549,31 @@ public class Connection {
                 self.intentionalDisconnect()
             }
         }
+    }
+
+    /**
+     Handler for what to do once the connection to the server is open.
+     - parameters:
+     - connectionTimeoutID: Timeout in case the connection hangs longer than expected.
+     - returns:
+     A promise that resolves to void when the connection is fully established.
+     - throws:
+     Error if the websocket initialized is somehow null.
+     */
+    private func onceOpen(connectionTimeoutID: Timer) async throws {
+        if self.ws == nil {
+            throw ConnectionError("onceOpen: ws is nil")
+        }
+
+        // Once the connection completes successfully, remove all old listeners
+        //        self.ws.removeAllListeners()
+        connectionTimeoutID.invalidate()
+
         // Finalize the connection and resolve all awaiting connect() requests
         do {
             self.retryConnectionBackoff.reset()
             self.startHeartbeatInterval()
             self.connectionManager.resolveAllAwaiting()
-            connectionTimeoutID.invalidate()
             //                self.emit("connected")
             NSLog("connected")
         } catch {
