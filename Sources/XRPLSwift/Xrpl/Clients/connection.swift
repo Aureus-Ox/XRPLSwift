@@ -320,6 +320,7 @@ public actor Connection: Sendable {
         //        this.ws.on('error', (error) => this.onConnectionFailed(error))
         //        this.ws.on('error', () => clearTimeout(connectionTimeoutID))
 
+        try await connectionLoopFuture.get()
         return await self.connectionManager.awaitConnection()
     }
 
