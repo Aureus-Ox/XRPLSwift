@@ -307,13 +307,14 @@ public class Connection {
         let client: WebSocketClient = createWebSocket(url: url, config: self.config)!
         try client.connect(scheme: isscheme, host: ishost, port: port, onUpgrade: { ws -> Void in
             self.ws = ws
+            self.setHandlers()
+
             Task {
                 // TODO: This goes after client.connect in js, but swift doesnt(verify) return the ws. we would .wait
                 // But if we .wait(), then the await connection func is hit after the onceOpen func
                 if self.ws == nil {
                     throw ConnectionError("Connect: created null websocket")
                 }
-                self.setHandlers()
 
                 try await self.onceOpen(connectionTimeoutID: connectionTimeoutID)
             }
