@@ -509,7 +509,7 @@ public class Connection {
 
         // Once the connection completes successfully, remove all old listeners
         //        self.ws.removeAllListeners()
-        connectionTimeoutID.invalidate()
+//        connectionTimeoutID.invalidate()
         // Add new, long-term connected listeners for messages and errors
         self.ws?.onText({ _, message in
             self.onMessage(message: message)
@@ -568,6 +568,7 @@ public class Connection {
             self.retryConnectionBackoff.reset()
             self.startHeartbeatInterval()
             self.connectionManager.resolveAllAwaiting()
+            connectionTimeoutID.invalidate()
             //                self.emit("connected")
             NSLog("connected")
         } catch {
