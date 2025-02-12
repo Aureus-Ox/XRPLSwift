@@ -307,8 +307,6 @@ public actor Connection: Sendable {
                     throw ConnectionError("Connect: created null websocket")
                 }
 
-                // TODO: This goes after client.connect in js, but swift doesnt(verify) return the ws. we would .wait
-                // But if we .wait(), then the await connection func is hit after the onceOpen func
                 await self.retryConnectionBackoff.reset()
                 await self.startHeartbeatInterval()
                 await self.connectionManager.resolveAllAwaiting()

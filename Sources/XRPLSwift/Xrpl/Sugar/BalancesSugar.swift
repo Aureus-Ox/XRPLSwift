@@ -26,6 +26,6 @@ func getXrpBalance(
     _ ledgerIndex: LedgerIndex? = nil
 ) async -> String {
     let xrpRequest = AccountInfoRequest(account: address, ledgerHash: ledgerHash, ledgerIndex: ledgerIndex)
-    let response = try? await client.request(xrpRequest).wait() as? BaseResponse<AccountInfoResponse>
-    return try! dropsToXrp((response?.result?.accountData.balance)!)
+    let response = try? await client.request(xrpRequest).get() as? BaseResponse<AccountInfoResponse>
+    return (try? dropsToXrp((response?.result?.accountData.balance)!)) ?? "0"
 }
