@@ -106,6 +106,25 @@ public class InfoLedger: Codable {
     }
 }
 
+public class ValidatedLedger: Codable {
+    public let baseFee: Int
+    public let closeTime: Int
+    public let hash: String
+    public let reserveBase: Int
+    public let reserveInc: Int
+    public let seq: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case baseFee = "base_fee"
+        case closeTime = "close_time"
+        case hash = "hash"
+        case reserveBase = "reserve_base"
+        case reserveInc = "reserve_inc"
+        case seq = "seq"
+    }
+}
+
+
 public class StateLoad: Codable {
     /**
      (Admin only) Information about the rate of different types of jobs
@@ -126,7 +145,7 @@ public class LastClosed: Codable {
      The amount of time it took to reach a consensus on the most recently
      validated ledger version, in seconds.
      */
-    public var convergeTimeS: Double
+    public var convergeTime: Double
     /**
      How many trusted validators the server considered (including itself,
      if configured as a validator) in the consensus process for the most
@@ -135,7 +154,7 @@ public class LastClosed: Codable {
     public var proposers: Int
 
     enum CodingKeys: String, CodingKey {
-        case convergeTimeS = "converge_time_s"
+        case convergeTime = "converge_time"
         case proposers = "proposers"
     }
 }
@@ -264,7 +283,7 @@ public class ServerInfoWrapper: Codable {
     /// Number of consecutive seconds that the server has been operational.
     public var uptime: Int?
     /// Information about the most recent fully-validated ledger.
-    public var validatedLedger: InfoLedger?
+    public var validatedLedger: ValidatedLedger?
     /**
      Minimum number of trusted validations required to validate a ledger
      version. Some circumstances may cause the server to require more
@@ -316,7 +335,7 @@ public class ServerInfoWrapper: Codable {
         buildVersion = try values.decode(String.self, forKey: .buildVersion)
         closedLedger = try values.decodeIfPresent(InfoLedger.self, forKey: .closedLedger)
         completeLedgers = try values.decode(String.self, forKey: .completeLedgers)
-        hostid = try? values.decode(String.self, forKey: .hostid)
+        hostid = try? values.decodeIfPresent(String.self, forKey: .hostid)
         ioLatencyMs = try values.decode(Int.self, forKey: .ioLatencyMs)
         jqTransOverflow = try values.decodeIfPresent(String.self, forKey: .jqTransOverflow)
         lastClose = try values.decode(LastClosed.self, forKey: .lastClose)
@@ -337,7 +356,7 @@ public class ServerInfoWrapper: Codable {
         stateAccounting = try? values.decodeIfPresent([ServerState: StateAccounting].self, forKey: .stateAccounting)
         time = try values.decodeIfPresent(String.self, forKey: .time)
         uptime = try values.decodeIfPresent(Int.self, forKey: .uptime)
-        validatedLedger = try values.decodeIfPresent(InfoLedger.self, forKey: .validatedLedger)
+        validatedLedger = try values.decodeIfPresent(ValidatedLedger.self, forKey: .validatedLedger)
         validationQuorum = try values.decode(Int.self, forKey: .validationQuorum)
         validatorListExpires = try values.decodeIfPresent(String.self, forKey: .validatorListExpires)
     }
