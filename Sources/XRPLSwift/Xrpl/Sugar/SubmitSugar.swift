@@ -285,14 +285,10 @@ func getSignedTx(
     _ wallet: Wallet?
 ) async throws -> String {
     if isSigned(transaction) {
-        var tx = try transaction.toJson()
-        if autofill {
-            tx = try await AutoFillSugar().autofill(client, tx, 0).get()
-        }
-
-        let serializedTx = try BinaryCodec.encode(tx)
+        let serializedTx = try BinaryCodec.encode(transaction.toJson())
         return serializedTx
     }
+
     guard let wallet = wallet else {
         throw ValidationError("Wallet must be provided when submitting an unsigned transaction")
     }
