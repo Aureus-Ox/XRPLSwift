@@ -285,7 +285,12 @@ func getSignedTx(
     _ wallet: Wallet?
 ) async throws -> String {
     if isSigned(transaction) {
-        let serializedTx = try BinaryCodec.encode(transaction.toJson())
+        var tx = try transaction.toJson()
+        if autofill {
+            tx = try await AutoFillSugar().autofill(client, tx, 0).get()
+        }
+
+        let serializedTx = try BinaryCodec.encode(tx)
         return serializedTx
     }
     guard let wallet = wallet else {
