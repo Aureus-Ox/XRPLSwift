@@ -32,7 +32,7 @@ public class AutoFillSugar {
      - returns
      The autofilled transaction.
      */
-    func autofill(
+    public func autofill(
         _ client: XrplClient,
         _ transaction: [String: AnyObject],
         _ signersCount: Int?
