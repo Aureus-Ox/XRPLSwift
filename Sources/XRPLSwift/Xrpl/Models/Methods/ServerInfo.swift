@@ -357,3 +357,7 @@ public class ServerInfoWrapper: Codable {
 public class ServerInfoResponse: Codable {
     public var info: ServerInfoWrapper
 }
+
+public class ServerInfoResult: Codable {
+    public var result: ServerInfoResponse
+}
