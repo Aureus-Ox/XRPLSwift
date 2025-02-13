@@ -166,7 +166,7 @@ public class ServerInfoWrapper: Codable {
      rippled instance; otherwise, returns a single RFC-1751  word based on
      the node public key.
      */
-    public var hostid: String
+    public var hostid: String?
     /**
      Amount of time spent waiting for I/O operations, in milliseconds. If
      this number is not very, very low, then the rippled server is probably
@@ -312,11 +312,11 @@ public class ServerInfoWrapper: Codable {
 
     public required init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
-        amendmentBlocked = try values.decodeIfPresent(Bool.self, forKey: .amendmentBlocked)
+        amendmentBlocked = try values.decodeIfPresent(Bool.self, forKey: .amendmentBlocked) ?? false
         buildVersion = try values.decode(String.self, forKey: .buildVersion)
         closedLedger = try values.decodeIfPresent(InfoLedger.self, forKey: .closedLedger)
         completeLedgers = try values.decode(String.self, forKey: .completeLedgers)
-        hostid = try values.decode(String.self, forKey: .hostid)
+        hostid = try? values.decode(String.self, forKey: .hostid)
         ioLatencyMs = try values.decode(Int.self, forKey: .ioLatencyMs)
         jqTransOverflow = try values.decodeIfPresent(String.self, forKey: .jqTransOverflow)
         lastClose = try values.decode(LastClosed.self, forKey: .lastClose)
@@ -334,7 +334,7 @@ public class ServerInfoWrapper: Codable {
         pubkeyValidator = try values.decodeIfPresent(String.self, forKey: .pubkeyValidator)
         serverState = try values.decode(String.self, forKey: .serverState)
         serverStateDurationUs = try values.decodeIfPresent(Int.self, forKey: .serverStateDurationUs)
-        stateAccounting = try values.decodeIfPresent([ServerState: StateAccounting].self, forKey: .stateAccounting)
+        stateAccounting = try? values.decodeIfPresent([ServerState: StateAccounting].self, forKey: .stateAccounting)
         time = try values.decodeIfPresent(String.self, forKey: .time)
         uptime = try values.decodeIfPresent(Int.self, forKey: .uptime)
         validatedLedger = try values.decodeIfPresent(InfoLedger.self, forKey: .validatedLedger)
@@ -356,8 +356,4 @@ public class ServerInfoWrapper: Codable {
  */
 public class ServerInfoResponse: Codable {
     public var info: ServerInfoWrapper
-}
-
-public class ServerInfoResult: Codable {
-    public var result: ServerInfoResponse
 }
