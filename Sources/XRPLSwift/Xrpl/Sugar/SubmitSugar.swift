@@ -246,8 +246,14 @@ func isSigned(_ transaction: String) -> Bool {
     let tx = BinaryCodec.decode(transaction)
     return isSigned(tx)
 }
+
 func isSigned(_ transaction: [String: AnyObject]) -> Bool {
     return transaction["SigningPubKey"] != nil || transaction["TxnSignature"] != nil
+}
+
+func isSigned(_ transaction: Transaction) -> Bool {
+    guard let tx = try? transaction.toJson() else { return false }
+    return tx["SigningPubKey"] != nil || tx["TxnSignature"] != nil
 }
 
 // initializes a transaction for a submit request
@@ -278,16 +284,17 @@ func getSignedTx(
     _ autofill: Bool = true,
     _ wallet: Wallet?
 ) async throws -> String {
-    //    if isSigned(transaction: transaction) {
-    //        return transaction
-    //    }
+    if isSigned(transaction) {
+        let serializedTx = try BinaryCodec.encode(transaction.toJson())
+        return serializedTx
+    }
     guard let wallet = wallet else {
         throw ValidationError("Wallet must be provided when submitting an unsigned transaction")
     }
     //    var tx = try transaction.toAny() as! BaseTransaction
     var tx = try transaction.toJson() as! [String: AnyObject]
     if autofill {
-        tx = try await AutoFillSugar().autofill(client, tx, 0).wait()
+        tx = try await AutoFillSugar().autofill(client, tx, 0).get()
     }
     return try wallet.sign(tx, false).txBlob
 }

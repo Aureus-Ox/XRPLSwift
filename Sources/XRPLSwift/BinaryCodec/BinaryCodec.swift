@@ -31,7 +31,7 @@ public class BinaryCodec {
      - returns:
      The binary-encoded object, as a hexadecimal string.
      */
-    class func encode(_ json: [String: Any]) throws -> String {
+    public class func encode(_ json: [String: Any]) throws -> String {
         return try serializeJson(json)
     }
 
