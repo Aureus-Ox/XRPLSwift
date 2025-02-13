@@ -135,7 +135,7 @@ public class AutoFillSugar {
     func fetchAccountDeleteFee(_ client: XrplClient) async -> Double {
         let request = ServerStateRequest()
         let response = try! await client.request(request).wait() as? BaseResponse<ServerStateResponse>
-        let fee = response!.result?.state.validatedLedger?.reserveIncXrp
+        let fee = response!.result?.state.validatedLedger?.reserveInc
         if fee == nil {
             //        return Promise.reject(XrplError("Could not fetch Owner Reserve."))
         }
