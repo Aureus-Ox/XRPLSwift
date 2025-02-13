@@ -27,7 +27,7 @@ public func getFeeXrp(
 ) async throws -> String {
     let feeCushion = cushion ?? client.feeCushion
 
-    let request = try ServerInfoRequest(["command": "server_state"] as [String: AnyObject])
+    let request = ServerStateRequest()
     let response = try await client.request(request).get() as? BaseResponse<ServerStateResponse>
     guard let response = response else { throw XrplError("Invalid Response") }
     guard let result = response.result else { throw XrplError("Invalid Result") }
