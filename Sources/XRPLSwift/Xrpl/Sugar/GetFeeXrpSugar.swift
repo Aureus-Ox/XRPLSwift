@@ -33,7 +33,7 @@ public func getFeeXrp(
     guard let result = response.result else { throw XrplError("Invalid Result") }
 
     let serverInfo = result.state
-    guard let baseFee = serverInfo.validatedLedger?.baseFeeXrp else {
+    guard let baseFee = serverInfo.validatedLedger?.baseFee else {
         throw XrplError("Xrp: Could not get base_fee_xrp from server_info")
     }
 
