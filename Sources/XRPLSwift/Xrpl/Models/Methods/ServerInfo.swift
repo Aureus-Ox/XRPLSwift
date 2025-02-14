@@ -352,7 +352,7 @@ public class ServerInfoWrapper: Codable {
         pubkeyNode = try values.decode(String.self, forKey: .pubkeyNode)
         pubkeyValidator = try values.decodeIfPresent(String.self, forKey: .pubkeyValidator)
         serverState = try values.decode(String.self, forKey: .serverState)
-        serverStateDurationUs = try values.decodeIfPresent(Int.self, forKey: .serverStateDurationUs)
+        serverStateDurationUs = try values.decodeIfPresent(String.self, forKey: .serverStateDurationUs)
         stateAccounting = try? values.decodeIfPresent([ServerState: StateAccounting].self, forKey: .stateAccounting)
         time = try values.decodeIfPresent(String.self, forKey: .time)
         uptime = try values.decodeIfPresent(Int.self, forKey: .uptime)
