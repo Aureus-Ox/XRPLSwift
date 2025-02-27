@@ -80,7 +80,7 @@ final class TestApi: XCTestCase {
     func testSignSECP256K1() throws {
         let privateKey = TestApi.fixtures.SECP256K1_KEYPAIR.privateKey
         let message = TestApi.fixtures.SECP256K1_MESSAGE
-        let messageHex = message.bytes
+        let messageHex = try message.convertStringToHex.bytes
         let signature = try Keypairs.sign(messageHex, privateKey)
         XCTAssertEqual(signature.toHex, TestApi.fixtures.SECP256K1_SIGNATURE)
     }
@@ -89,14 +89,14 @@ final class TestApi: XCTestCase {
         let signature = TestApi.fixtures.SECP256K1_SIGNATURE
         let publicKey = TestApi.fixtures.SECP256K1_KEYPAIR.publicKey
         let message = TestApi.fixtures.SECP256K1_MESSAGE
-        let messageBytes = message.bytes
+        let messageBytes = try message.convertStringToHex.bytes
         XCTAssertTrue(try Keypairs.verify(Data(hex: signature).bytes, messageBytes, publicKey))
     }
 
     func testSignED25519() throws {
         let privateKey = TestApi.fixtures.ED25519_KEYPAIR.privateKey
         let message = TestApi.fixtures.ED25519_MESSAGE
-        let messageHex = message.bytes
+        let messageHex = try message.convertStringToHex.bytes
         let signature = try Keypairs.sign(messageHex, privateKey)
         XCTAssertEqual(signature.toHex, TestApi.fixtures.ED25519_SIGNATURE)
     }
@@ -105,7 +105,7 @@ final class TestApi: XCTestCase {
         let signature = TestApi.fixtures.ED25519_SIGNATURE
         let publicKey = TestApi.fixtures.ED25519_KEYPAIR.publicKey
         let message = TestApi.fixtures.ED25519_MESSAGE
-        let messageHex = message.bytes
+        let messageHex = try message.convertStringToHex.bytes
         XCTAssertTrue(try Keypairs.verify(Data(hex: signature).bytes, messageHex, publicKey))
     }
 

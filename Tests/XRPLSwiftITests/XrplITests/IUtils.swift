@@ -16,7 +16,7 @@ let masterSecret = "snoPBrXtMeMyMHUVTgbuqAfg1SUTb"
 
 public func ledgerAccept(client: XrplClient) async {
     let request = [ "command": "ledger_accept" ] as [String: AnyObject]
-    _ = try! await client.connection.request(request: BaseRequest(request))
+    _ = try! await client.connection.request(request: BaseRequest(request), timeout: 3)
 }
 
 // public func subscribeDone(client: Client, done: Mocha.Done): void {

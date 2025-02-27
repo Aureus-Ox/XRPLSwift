@@ -1,6 +1,7 @@
 > THIS REPOSITORY IS NOT FINISHED. README IS NOT UP TO DATE. EXPECT DRAGONS. SEE TESTS FOR CURRENT IMPLEMENTATIONS.
 
 > UPDATE: @nick-lobue is picking up where this left off. This repo seems to be a clone of [xrpl-py](https://github.com/XRPLF/xrpl-py). 
+
 > NOTE: WALLET AND SIGNING INFRA WILL NOT BE PROPERLY AUDITED AND MAINTAINED AT THIS TIME. USE AT YOUR OWN RISK!!!
 
 > All contributions welcome.

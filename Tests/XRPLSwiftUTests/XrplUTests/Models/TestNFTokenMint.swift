@@ -24,7 +24,7 @@ final class TestNFTokenMint: XCTestCase {
             "NFTokenTaxon": 0,
             "Issuer": "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ",
             "TransferFee": 1,
-            "URI": "http://xrpl.org".bytes.toHex
+            "URI": "http://xrpl.org".convertStringToHex
         ] as! [String: AnyObject]
         let tx = try! NFTokenMint(json: baseTx)
         do {
@@ -44,7 +44,7 @@ final class TestNFTokenMint: XCTestCase {
             //            "NFTokenTaxon": 0,
             "Issuer": "rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm",
             "TransferFee": 1,
-            "URI": "http://xrpl.org".bytes.toHex
+            "URI": "http://xrpl.org".convertStringToHex
         ] as! [String: AnyObject]
         XCTAssertThrowsError(try NFTokenMint(json: baseTx))
     }
@@ -59,7 +59,7 @@ final class TestNFTokenMint: XCTestCase {
             "NFTokenTaxon": 0,
             "Issuer": "rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm",
             "TransferFee": 1,
-            "URI": "http://xrpl.org".bytes.toHex
+            "URI": "http://xrpl.org".convertStringToHex
         ] as! [String: AnyObject]
         let tx = try! NFTokenMint(json: baseTx)
         XCTAssertThrowsError(try validateNFTokenMint(tx: tx.toJson()))

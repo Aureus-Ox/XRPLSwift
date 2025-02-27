@@ -65,6 +65,20 @@ final class RippledFixtures {
         }
         return [:]
     }
+    
+    public static func serverState() -> [String: AnyObject] {
+        do {
+            let data: Data = rippledServerStateJson.data(using: .utf8)!
+            let jsonResult = try JSONSerialization.jsonObject(with: data, options: .mutableLeaves)
+            if let jsonResult = jsonResult as? [String: AnyObject] {
+                return jsonResult
+            }
+        } catch {
+            print(error.localizedDescription)
+            fatalError("INVALID JSON RESPONSE FIXTURE")
+        }
+        return [:]
+    }
 }
 
 final class RippledTxFixtures {

@@ -36,6 +36,6 @@ final class TestKeypairsUtils: XCTestCase {
 
     func testFailHexToBytes() {
         // BAD BAD BAD BAD
-        XCTAssertNotEqual("DEADBEEF".bytes.toHex, "DEADBEEF")
+        XCTAssertNotEqual(try "DEADBEEF".convertStringToHex.bytes.toHex, "DEADBEEF")
     }
 }

@@ -155,7 +155,7 @@ public class XrplClient: ConnectionDelegate {
     /*
      * Underlying connection to rippled.
      */
-    public var connection: Connection
+    public var connection: WebsocketResponding
 
     /**
      * Factor to multiply estimated fee by to provide a cushion in case the
@@ -346,7 +346,7 @@ public class XrplClient: ConnectionDelegate {
         //        } else {
         //            requestDict["account"] = nil
         //        }
-        let response = try! await self.connection.request(request: r)
+        let response = try! await self.connection.request(request: r, timeout: 3)
 
         // mutates `response` to add warnings
         //        handlePartialPayment(req.command, response)
@@ -382,7 +382,7 @@ public class XrplClient: ConnectionDelegate {
 //        } else {
 //            requestDict["account"] = nil
 //        }
-        let response = try await self.connection.request(request: req)
+        let response = try await self.connection.request(request: req, timeout: 3)
 
         // mutates `response` to add warnings
 //        handlePartialPayment(req.command, response)

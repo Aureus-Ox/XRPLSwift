@@ -8,6 +8,7 @@
 // https://github.com/XRPLF/xrpl-py/blob/master/xrpl/core/binarycodec/types/currency.py
 
 import Foundation
+import CryptoSwift
 
 // swiftlint:disable:next identifier_name
 let CURRENCY_CODE_LENGTH: Int = 20
@@ -55,7 +56,9 @@ func isoToBytes(iso: String) throws -> [UInt8] {
         return [UInt8].init(repeating: 0x0, count: CURRENCY_CODE_LENGTH)
     }
 
-    guard let isoBytes = try? iso.bytes else {
+    let isoBytes = iso.bytes
+
+    guard !isoBytes.isEmpty else {
         fatalError("Invalid ISO code: \(iso)")
     }
 

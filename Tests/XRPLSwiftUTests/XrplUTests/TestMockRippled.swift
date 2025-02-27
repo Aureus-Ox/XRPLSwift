@@ -22,7 +22,7 @@ final class TestMockRippled: RippledMockTester {
         do {
             let request = ServerInfoRequest()
             self.mockRippled.suppressOutput = true
-            _ = try await self.client.request(req: request)?.wait()
+            _ = try await self.client.request(req: request)?.get()
             XCTFail()
         } catch let error as XrplError {
             XCTAssert(error is XrplError)

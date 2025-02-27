@@ -187,6 +187,7 @@ public func websocketSendAsync(
 
 public protocol ConnectionDelegate: AnyObject {
     func error(code: Int, message: Any, data: Data)
+    func connect() async throws -> EventLoopFuture<Any>
     func connected()
     func disconnected(code: Int)
     func ledgerClosed(ledger: Any)
@@ -198,13 +199,21 @@ public protocol ConnectionDelegate: AnyObject {
     func pathFind(path: Any)
 }
 
+public protocol WebsocketResponding: AnyObject {
+    func isConnected() async -> Bool
+    func connect() async throws -> EventLoopFuture<Any>
+    func disconnect() async -> EventLoopFuture<Any?>
+    func reconnect() async throws
+    
+    func request<R: BaseRequest>(request: R, timeout: Int?) async throws -> EventLoopFuture<Any>
+    func getUrl() async -> String
+}
+
 /**
  The main Connection class. Responsible for connecting to & managing
  an active WebSocket connection to a XRPL node.
  */
-public actor Connection: Sendable {
-    var delegate: ConnectionDelegate?
-
+public actor Connection: Sendable, WebsocketResponding {
     internal var trace: ConsoleLog?
 
     internal let url: String?
@@ -374,8 +383,8 @@ public actor Connection: Sendable {
          * See: https://github.com/XRPLF/xrpl.js/pull/1101#issuecomment-565360423
          */
         //        self.emit("reconnect")
-        _ = await self.disconnect()
-        _ = try await self.connect()
+        _ = try await self.disconnect().get()
+        _ = try await self.connect().get()
     }
 
     /**

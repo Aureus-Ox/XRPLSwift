@@ -128,14 +128,14 @@ public class AutoFillSugar {
         _ tx: inout [String: AnyObject]
     ) async {
         let request = AccountInfoRequest(account: tx["Account"] as! String, ledgerIndex: .string("current"))
-        let response = try! await client.request(r: request).wait() as? BaseResponse<AccountInfoResponse>
+        let response = try! await client.request(r: request).get() as? BaseResponse<AccountInfoResponse>
         tx["Sequence"] = response!.result?.accountData.sequence as AnyObject
     }
 
     func fetchAccountDeleteFee(_ client: XrplClient) async -> Double {
         let request = ServerStateRequest()
-        let response = try! await client.request(request).wait() as? BaseResponse<ServerStateResponse>
-        let fee = response!.result?.state.validatedLedger?.reserveInc
+        let response = try! await client.request(request).get() as? BaseResponse<ServerStateResponse>
+        let fee = response!.result?.state.validatedLedger?.reserveIncXrp
         if fee == nil {
             //        return Promise.reject(XrplError("Could not fetch Owner Reserve."))
         }
@@ -201,7 +201,7 @@ public class AutoFillSugar {
             "ledger_index": "validated",
             "deletion_blockers_only": true
         ] as [String: AnyObject])
-        let response = try await client.request(request).wait() as? BaseResponse<AccountObjectsResponse>
+        let response = try await client.request(request).get() as? BaseResponse<AccountObjectsResponse>
         if let result = response?.result, result.accountObjects.count > 0 {
             throw XrplError(
                 "Account \(tx["Account"]) cannot be deleted; there are Escrows, PayChannels, RippleStates, or Checks associated with the account."

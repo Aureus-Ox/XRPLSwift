@@ -9,6 +9,7 @@
 
 import XCTest
 @testable import XRPLSwift
+import secp256k1
 
 let IOU_CASES: [String: [String: String]] = [
     "800000000000000000000000000000000000000055534400000000008B1CE810C13D6F337DAC85863B3D70265A24DF44":
@@ -142,6 +143,7 @@ final class TestAmount: XCTestCase {
 
     func testFixtures() {
         for fixture in dataDrivenFixturesForType(typeString: "Amount") {
+//            Array(hexString: "USD".lowercased())
             TestSerializedType.fixtureTest(fixture: fixture)
         }
     }

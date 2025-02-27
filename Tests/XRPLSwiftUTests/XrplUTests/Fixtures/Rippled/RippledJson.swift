@@ -7,6 +7,93 @@
 
 import Foundation
 
+let rippledServerStateJson = """
+{
+  "result": {
+    "state": {
+      "build_version": "2.3.1",
+      "complete_ledgers": "6-5182330",
+      "initial_sync_duration_us": "30622467",
+      "io_latency_ms": 1,
+      "jq_trans_overflow": "0",
+      "last_close": {
+        "converge_time": 2001,
+        "proposers": 6
+      },
+      "load_base": 256,
+      "load_factor": 256,
+      "load_factor_fee_escalation": 256,
+      "load_factor_fee_queue": 256,
+      "load_factor_fee_reference": 256,
+      "load_factor_server": 256,
+      "network_id": 1,
+      "peer_disconnects": "89403",
+      "peer_disconnects_resources": "2656",
+      "peers": 89,
+      "ports": [
+        {
+          "port": "2459",
+          "protocol": [
+            "peer"
+          ]
+        },
+        {
+          "port": "51233",
+          "protocol": [
+            "ws2",
+            "wss2"
+          ]
+        },
+        {
+          "port": "50051",
+          "protocol": [
+            "grpc"
+          ]
+        }
+      ],
+      "pubkey_node": "n9KEk3TLMuoiTTLgrWWmfYm99hHFBZTXWzoyrHr3FbJWmRCXm96v",
+      "server_state": "full",
+      "server_state_duration_us": "2354651664877",
+      "state_accounting": {
+        "connected": {
+          "duration_us": "10003553",
+          "transitions": "1"
+        },
+        "disconnected": {
+          "duration_us": "17617939",
+          "transitions": "1"
+        },
+        "full": {
+          "duration_us": "2354651664877",
+          "transitions": "1"
+        },
+        "syncing": {
+          "duration_us": "3000943",
+          "transitions": "1"
+        },
+        "tracking": {
+          "duration_us": "31",
+          "transitions": "1"
+        }
+      },
+      "time": "2025-Feb-27 00:30:58.860540 UTC",
+      "uptime": 2354682,
+      "validated_ledger": {
+        "base_fee": 10,
+        "close_time": 793931453,
+        "hash": "41602EFCE941E9A0EFC29302ACABEF20C03572C0722623FF6E4A22544598A33B",
+        "reserve_base": 1000000,
+        "reserve_inc": 200000,
+        "seq": 5182330
+      },
+      "validation_quorum": 5
+    }
+  },
+  "status": "success",
+  "type": "response"
+}
+"""
+
 let rippledLedgerJson = """
 {
   "id": 0,
@@ -40,34 +127,84 @@ let rippledLedgerJson = """
 
 let rippledServerInfoJson = """
 {
-  "id": 0,
-  "status": "success",
-  "type": "response",
   "result": {
     "info": {
-      "build_version": "0.24.0-rc1",
-      "complete_ledgers": "32570-6595042",
-      "hostid": "ARTS",
+      "build_version": "2.3.1",
+      "complete_ledgers": "6-5197446",
+      "hostid": "TUN",
+      "initial_sync_duration_us": "30622467",
       "io_latency_ms": 1,
+      "jq_trans_overflow": "0",
       "last_close": {
-        "converge_time_s": 2.007,
-        "proposers": 4
+        "converge_time_s": 2,
+        "proposers": 6
       },
       "load_factor": 1,
-      "peers": 53,
-      "pubkey_node": "n94wWvFUmaKGYrKUGgpv1DyYgDeXRGdACkNQaSe7zJiy5Znio7UC",
+      "network_id": 1,
+      "peer_disconnects": "90897",
+      "peer_disconnects_resources": "2661",
+      "peers": 89,
+      "ports": [
+        {
+          "port": "2459",
+          "protocol": [
+            "peer"
+          ]
+        },
+        {
+          "port": "51233",
+          "protocol": [
+            "ws2",
+            "wss2"
+          ]
+        },
+        {
+          "port": "50051",
+          "protocol": [
+            "grpc"
+          ]
+        }
+      ],
+      "pubkey_node": "n9KEk3TLMuoiTTLgrWWmfYm99hHFBZTXWzoyrHr3FbJWmRCXm96v",
       "server_state": "full",
-      "validated_ledger": {
-        "age": 5,
-        "base_fee_xrp": 0.00001,
-        "hash": "4482DEE5362332F54A4036ED57EE1767C9F33CF7CE5A6670355C16CECE381D46",
-        "reserve_base_xrp": 20,
-        "reserve_inc_xrp": 5,
-        "seq": 6595042
+      "server_state_duration_us": "2400866326231",
+      "state_accounting": {
+        "connected": {
+          "duration_us": "10003553",
+          "transitions": "1"
+        },
+        "disconnected": {
+          "duration_us": "17617939",
+          "transitions": "1"
+        },
+        "full": {
+          "duration_us": "2400866326231",
+          "transitions": "1"
+        },
+        "syncing": {
+          "duration_us": "3000943",
+          "transitions": "1"
+        },
+        "tracking": {
+          "duration_us": "31",
+          "transitions": "1"
+        }
       },
-      "validation_quorum": 3
+      "time": "2025-Feb-27 13:21:13.521894 UTC",
+      "uptime": 2400896,
+      "validated_ledger": {
+        "age": 3,
+        "base_fee_xrp": 0.00001,
+        "hash": "499F335358092F3CEA4706EF949C6B3B71C389FF9F48BE62190C77E48407FBD6",
+        "reserve_base_xrp": 1,
+        "reserve_inc_xrp": 0.2,
+        "seq": 5197446
+      },
+      "validation_quorum": 5
     }
-  }
+  },
+  "status": "success",
+  "type": "response"
 }
 """
 

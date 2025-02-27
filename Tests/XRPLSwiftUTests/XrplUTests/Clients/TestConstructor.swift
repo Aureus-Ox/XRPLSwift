@@ -29,9 +29,10 @@ final class TestConstructor: XCTestCase {
         XCTAssertThrowsError(try XrplClient(server: "wss://s1.ripple.com", options: options))
     }
 
-    func testClientValidOptions() {
+    func testClientValidOptions() async {
         let client = try! XrplClient(server: "wss://s:1")
-        XCTAssertEqual(client.url(), "wss://s:1")
+        let url = await client.url()
+        XCTAssertEqual(url, "wss://s:1")
     }
 
     // TODO: NOT PASSING

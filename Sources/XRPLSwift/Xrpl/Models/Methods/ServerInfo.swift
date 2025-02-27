@@ -37,19 +37,19 @@ public class ServerInfoRequest: BaseRequest {
     }
 }
 
-public typealias ServerState = String
-// export type ServerState =
-//  | 'disconnected'
-//  | 'connected'
-//  | 'syncing'
-//  | 'tracking'
-//  | 'full'
-//  | 'validating'
-//  | 'proposing'
+public enum ServerState: String, Codable {
+    case disconnected = "disconnected"
+    case connected = "connected"
+    case syncing = "syncing"
+    case tracking = "tracking"
+    case full = "full"
+    case validating = "validating"
+    case proposing = "proposing"
+}
 
 public class StateAccounting: Codable {
     public var durationUs: String
-    public var transitions: Int
+    public var transitions: String
 
     enum CodingKeys: String, CodingKey {
         case durationUs = "duration_us"
@@ -107,19 +107,34 @@ public class InfoLedger: Codable {
 }
 
 public class ValidatedLedger: Codable {
-    public let baseFee: Int
-    public let closeTime: Int
-    public let hash: String
-    public let reserveBase: Int
-    public let reserveInc: Int
-    public let seq: Int
-    
+    /// The time since the ledger was closed, in seconds.
+    public var age: Int
+    /**
+     Base fee, in XRP. This may be represented in scientific notation.
+     Such as 1e-05 for 0.00005.
+     */
+    public var baseFeeXrp: Double
+    /// Unique hash for the ledger, as hexadecimal.
+    public var hash: String
+    /**
+     Minimum amount of XRP (not drops) necessary for every account to.
+     Keep in reserve .
+     */
+    public var reserveBaseXrp: Double
+    /**
+     Amount of XRP (not drops) added to the account reserve for each
+     object an account owns in the ledger.
+     */
+    public var reserveIncXrp: Double
+    /// The ledger index of the latest validated ledger.
+    public var seq: Int
+
     enum CodingKeys: String, CodingKey {
-        case baseFee = "base_fee"
-        case closeTime = "close_time"
+        case age = "age"
+        case baseFeeXrp = "base_fee_xrp"
         case hash = "hash"
-        case reserveBase = "reserve_base"
-        case reserveInc = "reserve_inc"
+        case reserveBaseXrp = "reserve_base_xrp"
+        case reserveIncXrp = "reserve_inc_xrp"
         case seq = "seq"
     }
 }
@@ -154,10 +169,17 @@ public class LastClosed: Codable {
     public var proposers: Int
 
     enum CodingKeys: String, CodingKey {
-        case convergeTime = "converge_time"
+        case convergeTime = "converge_time_s"
         case proposers = "proposers"
     }
 }
+
+
+public struct PortDescriptor: Codable {
+    public var port: String
+    public var `protocol`: [String]
+}
+
 
 public class ServerInfoWrapper: Codable {
     /**
@@ -174,7 +196,7 @@ public class ServerInfoWrapper: Codable {
      `validated_ledger` instead. The member fields are the same as the.
      `validated_ledger` field.
      */
-    public var closedLedger: InfoLedger?
+    public var closedLedger: ValidatedLedger?
     /**
      Range expression indicating the sequence numbers of the ledger
      versions the local rippled has in its database.
@@ -250,7 +272,11 @@ public class ServerInfoWrapper: Codable {
      cost.
      */
     public var loadFactorServer: Int?
-    public var networkLedger: String? = "waiting"
+    /**
+     A list of ports where the server is listening for API commands.
+     Each entry in the array is a Port Descriptor object. New in: rippled 1.12.0
+     */
+    public var ports: [PortDescriptor] = []
     /// How many other rippled servers this one is currently connected to.
     public var peers: Int
     /**
@@ -315,8 +341,8 @@ public class ServerInfoWrapper: Codable {
         case loadFactorFeeEscalation = "load_factor_fee_escalation"
         case loadFactorFeeQueue = "load_factor_fee_queue"
         case loadFactorServer = "load_factor_server"
-        case networkLedger = "network_ledger"
         case peers = "peers"
+        case ports = "ports"
         case pubkeyNode = "pubkey_node"
         case pubkeyValidator = "pubkey_validator"
         case serverState = "server_state"
@@ -333,7 +359,7 @@ public class ServerInfoWrapper: Codable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         amendmentBlocked = try values.decodeIfPresent(Bool.self, forKey: .amendmentBlocked) ?? false
         buildVersion = try values.decode(String.self, forKey: .buildVersion)
-        closedLedger = try values.decodeIfPresent(InfoLedger.self, forKey: .closedLedger)
+        closedLedger = try values.decodeIfPresent(ValidatedLedger.self, forKey: .closedLedger)
         completeLedgers = try values.decode(String.self, forKey: .completeLedgers)
         hostid = try? values.decodeIfPresent(String.self, forKey: .hostid)
         ioLatencyMs = try values.decode(Int.self, forKey: .ioLatencyMs)
@@ -347,16 +373,15 @@ public class ServerInfoWrapper: Codable {
         loadFactorFeeEscalation = try values.decodeIfPresent(Int.self, forKey: .loadFactorFeeEscalation)
         loadFactorFeeQueue = try values.decodeIfPresent(Int.self, forKey: .loadFactorFeeQueue)
         loadFactorServer = try values.decodeIfPresent(Int.self, forKey: .loadFactorServer)
-        networkLedger = try values.decodeIfPresent(String.self, forKey: .networkLedger)
         peers = try values.decode(Int.self, forKey: .peers)
         pubkeyNode = try values.decode(String.self, forKey: .pubkeyNode)
         pubkeyValidator = try values.decodeIfPresent(String.self, forKey: .pubkeyValidator)
-        serverState = try values.decode(String.self, forKey: .serverState)
+        serverState = try values.decode(ServerState.self, forKey: .serverState)
         serverStateDurationUs = try values.decodeIfPresent(String.self, forKey: .serverStateDurationUs)
         stateAccounting = try? values.decodeIfPresent([ServerState: StateAccounting].self, forKey: .stateAccounting)
         time = try values.decodeIfPresent(String.self, forKey: .time)
         uptime = try values.decodeIfPresent(Int.self, forKey: .uptime)
-        validatedLedger = try values.decodeIfPresent(ValidatedLedger.self, forKey: .validatedLedger)
+        validatedLedger = try? values.decodeIfPresent(ValidatedLedger.self, forKey: .validatedLedger)
         validationQuorum = try values.decode(Int.self, forKey: .validationQuorum)
         validatorListExpires = try values.decodeIfPresent(String.self, forKey: .validatorListExpires)
     }

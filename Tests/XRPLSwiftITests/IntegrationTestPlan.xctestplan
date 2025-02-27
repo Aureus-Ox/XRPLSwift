@@ -1,6 +1,12 @@
 {
   "configurations" : [
+    {
+      "id" : "0073275C-4277-4817-814C-E6BEDF88E38A",
+      "name" : "Configuration 1",
+      "options" : {
 
+      }
+    }
   ],
   "defaultOptions" : {
     "testTimeoutsEnabled" : true

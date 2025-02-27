@@ -17,15 +17,28 @@ public class RippledMockTester: XCTestCase {
 
     public var wallet: Wallet!
 
-    public override func setUp() async throws {
-        let exp = expectation(description: "base")
+    public override func setUp() {
         self.mockRippled = MockRippledSocket(port: 9999)
-        try! self.mockRippled.start()
+        self.mockRippled.start()
         self._mockedServerPort = 9999
         self.client = try! XrplClient(server: "ws://localhost:\(9999)")
-        _ = try await self.client.connect().wait()
-        exp.fulfill()
-        await waitForExpectations(timeout: 5)
+        
+        Task {
+            _ = try await self.client.connect().get()
+        }
+
+        // Await connection - Really shouldn't be doing this but keeping for now
+        sleep(1)
+    }
+
+    public override func tearDown() {
+        Task {
+            await self.client.disconnect()
+        }
+
+        // Await disconnect - Really shouldn't be doing this but keeping for now
+        sleep(1)
+        self.mockRippled.tearDown()
     }
 }
 

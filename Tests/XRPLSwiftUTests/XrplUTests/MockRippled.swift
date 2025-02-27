@@ -10,6 +10,8 @@
 import Foundation
 import Network
 import OSLog
+import WebSocketKit
+import NIOPosix
 
 @testable import XRPLSwift
 
@@ -38,6 +40,94 @@ public struct MockError: Error {
 }
 
 public class PortResponse: BaseResponse<Any> {}
+
+class MockConnection: WebsocketResponding {
+    let url: String
+    let eventGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+    init(url: String) {
+        self.url = url
+    }
+
+    func isConnected() async -> Bool {
+        return true
+    }
+    
+    func connect() async throws -> NIOCore.EventLoopFuture<Any> {
+        return eventGroup.next().makePromise().futureResult
+    }
+    
+    func disconnect() async -> NIOCore.EventLoopFuture<Any?> {
+        return eventGroup.next().makePromise().futureResult
+    }
+    
+    func reconnect() async throws {
+        // No-op
+    }
+    
+    func request<R>(request: R, timeout: Int?) async throws -> NIOCore.EventLoopFuture<Any> where R : XRPLSwift.BaseRequest {
+        return eventGroup.next().makePromise().futureResult
+    }
+    
+    func getUrl() async -> String {
+        return url
+    }
+    
+    
+}
+
+class MockXRPLClient: ConnectionDelegate {
+    let mockWebsocketConnection: WebsocketResponding
+    let eventGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+    init(mockWebsocketConnection: WebsocketResponding) {
+        self.mockWebsocketConnection = mockWebsocketConnection
+    }
+
+    func connect() async throws -> NIOCore.EventLoopFuture<Any> {
+        return eventGroup.next().makePromise().futureResult
+    }
+
+    func error(code: Int, message: Any, data: Data) {
+        
+    }
+    
+    func connected() {
+        
+    }
+    
+    func disconnected(code: Int) {
+        
+    }
+    
+    func ledgerClosed(ledger: Any) {
+        
+    }
+    
+    func transaction(tx: Any) {
+        
+    }
+    
+    func validationReceived(validation: Any) {
+        
+    }
+    
+    func manifestReceived(manifest: Any) {
+        
+    }
+    
+    func peerStatusChange(status: Any) {
+        
+    }
+    
+    func consensusPhase(consensus: Any) {
+        
+    }
+    
+    func pathFind(path: Any) {
+        
+    }
+}
 
 class MockRippledSocket {
 
@@ -109,12 +199,18 @@ class MockRippledSocket {
         listener.start(queue: serverQueue)
         startTimer()
     }
+    
+    func tearDown() {
+        listener.cancel()
+        self.timer?.invalidate()
+        self.timer = nil
+    }
 
     func receive(conn: NWConnection) {
         conn.receiveMessage { (data, context, _, error) in
             self.logger.info("[MOCK] receive")
             var request: [String: AnyObject] = [:]
-            guard let data = data, let context = context else {
+            guard let data = data, let _ = context else {
                 return
             }
             do {

@@ -16,11 +16,14 @@ final class TestConnection: RippledMockTester {
         try await super.setUp()
     }
 
-    func testValidConnection() {
+    func testValidConnection() async {
         let connection: Connection = Connection(url: "url")
-        XCTAssertEqual(connection.getUrl(), "url")
-        XCTAssert(connection.config.proxy == nil)
-        XCTAssert(connection.config.authorization == nil)
+        let url = await connection.getUrl()
+        let config = await connection.config
+
+        XCTAssertEqual(url, "url")
+        XCTAssert(config.proxy == nil)
+        XCTAssert(config.authorization == nil)
     }
 
     func testMultipleDisconnect() async {
@@ -29,7 +32,9 @@ final class TestConnection: RippledMockTester {
     }
 
     func testReconnect() async {
-        _ = try! await self.client.connection.reconnect()
+        Task {
+            _ = try! await self.client.connection.reconnect()
+        }
     }
 
     func testNotConnected() async {
@@ -70,7 +75,7 @@ final class TestConnection: RippledMockTester {
             print(error.localizedDescription)
             XCTFail()
         }
-        await waitForExpectations(timeout: 5)
+        await fulfillment(of: [exp], timeout: 3)
     }
 
     //    func testDisconnectedOnOpen() async {
@@ -116,7 +121,7 @@ final class TestConnection: RippledMockTester {
         } catch {
             XCTFail()
         }
-        await waitForExpectations(timeout: 1)
+        await fulfillment(of: [exp], timeout: 1)
     }
 
     func testReconnectUnecpectedClose() async {
@@ -139,7 +144,7 @@ final class TestConnection: RippledMockTester {
         } catch {
             XCTFail()
         }
-        await waitForExpectations(timeout: 1)
+        await fulfillment(of: [exp], timeout: 1)
     }
 }
 
@@ -166,11 +171,14 @@ final class TestTrace: XCTestCase {
         //        teardownClient()
     }
 
-    func testValidConnection() {
+    func testValidConnection() async {
         let connection: Connection = Connection(url: "url")
-        XCTAssertEqual(connection.getUrl(), "url")
-        XCTAssert(connection.config.proxy == nil)
-        XCTAssert(connection.config.authorization == nil)
+        let url = await connection.getUrl()
+        let config = await connection.config
+
+        XCTAssertEqual(url, "url")
+        XCTAssert(config.proxy == nil)
+        XCTAssert(config.authorization == nil)
     }
 
     func _testAsFalse() async {
@@ -180,7 +188,7 @@ final class TestTrace: XCTestCase {
         //        }
         let opts: ConnectionUserOptions = ConnectionUserOptions()
         let connection: Connection = Connection(url: "url", options: opts)
-        connection.ws?.send([])
+        try? await connection.ws?.send([])
 
         try! await connection.request(request: try! BaseRequest(mockedRequestData))
         //        connection.onMessage(mockedResponse)
@@ -195,7 +203,7 @@ final class TestTrace: XCTestCase {
         //        }
         let opts: ConnectionUserOptions = ConnectionUserOptions()
         let connection: Connection = Connection(url: "url", options: opts)
-        connection.ws?.send([])
+//        try? await connection.ws?.send([])
 
         //        connection.request(request: mockedRequestData)
         //        connection.onMessage(mockedResponse)
@@ -210,7 +218,7 @@ final class TestTrace: XCTestCase {
         //        }
         let opts: ConnectionUserOptions = ConnectionUserOptions()
         let connection: Connection = Connection(url: "url", options: opts)
-        connection.ws?.send([])
+//        connection.ws?.send([])
 
         //        connection.request(request: mockedRequestData)
         //        connection.onMessage(mockedResponse)

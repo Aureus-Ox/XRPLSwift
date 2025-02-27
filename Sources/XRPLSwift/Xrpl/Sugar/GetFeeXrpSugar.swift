@@ -27,21 +27,23 @@ public func getFeeXrp(
 ) async throws -> String {
     let feeCushion = cushion ?? client.feeCushion
 
-    let request = ServerStateRequest()
-    let response = try await client.request(request).get() as? BaseResponse<ServerStateResponse>
-    guard let response = response else { throw XrplError("Invalid Response") }
+    let request = ServerInfoRequest()
+    let response = try await client.request(request).get()
+    guard let response = response as? BaseResponse<ServerInfoResponse> else { throw XrplError("Invalid Response") }
     guard let result = response.result else { throw XrplError("Invalid Result") }
 
-    let serverInfo = result.state
-    guard let baseFee = serverInfo.validatedLedger?.baseFee else {
+    let serverInfo = result.info
+    guard let baseFee = serverInfo.validatedLedger?.baseFeeXrp else {
         throw XrplError("Xrp: Could not get base_fee_xrp from server_info")
     }
 
     let baseFeeXrp = Double(baseFee)
-    var loadFactor = serverInfo.loadFactor ?? 1
+    let loadFactor = serverInfo.loadFactor ?? 1
     var fee = baseFeeXrp * Double(loadFactor) * feeCushion
     // Cap fee to `client.maxFeeXRP`
-    fee = min(fee, Double(client.maxFeeXRP)!)
+    let maxFeeXRP = try xrpToDrops(client.maxFeeXRP)
+
+    fee = min(fee, Double(maxFeeXRP)!)
     // Round fee to 6 decimal places
     return fee.description
 }

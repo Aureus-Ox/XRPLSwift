@@ -7,7 +7,7 @@ let package = Package(
     name: "XRPLSwift",
     platforms: [
         .macOS(.v10_15),
-        .iOS(.v13),
+        .iOS(.v14),
         .tvOS(.v13),
         .watchOS(.v5)
     ],
@@ -42,6 +42,8 @@ let package = Package(
                 "BigInt"
             ],
             plugins: [
+                // Commenting this out as it requires the project using it to agree to allow executable
+                // code. Given this is a cryptocurrency project, this doesn't bode well.
 //                .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
             ]
         ),
