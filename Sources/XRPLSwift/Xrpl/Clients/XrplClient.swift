@@ -621,6 +621,12 @@ public class XrplClient: ConnectionDelegate {
     public func autofill(transaction: Transaction, signersCount: Int? = 0) async throws -> EventLoopFuture<[String: AnyObject]> {
         return try await AutoFillSugar().autofill(self, try transaction.toJson(), signersCount)
     }
+    
+    // We should phase out `Transaction` in liu of BaseTransaction. No need to wrap in an enum,
+    // makes for bad abstraction.
+    public func autofill(transaction: BaseTransaction, signersCount: Int? = 0) async throws -> EventLoopFuture<[String: AnyObject]> {
+        return try await AutoFillSugar().autofill(self, try transaction.toJson(), signersCount)
+    }
 
     public func submit(transaction: Transaction, opts: SubmitOptions?) async throws -> EventLoopFuture<Any> {
         return try await XRPLSwift.submit(
