@@ -50,7 +50,7 @@ public class CheckCash: BaseTransaction {
         super.init(account: "", transactionType: "CheckCash")
     }
 
-    override public init(json: [String: AnyObject]) throws {
+    public required init(json: [String: AnyObject]) throws {
         let decoder = JSONDecoder()
         let data: Data = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
         let decoded = try decoder.decode(CheckCash.self, from: data)

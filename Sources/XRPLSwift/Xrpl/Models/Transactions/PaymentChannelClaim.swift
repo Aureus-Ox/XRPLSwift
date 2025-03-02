@@ -119,7 +119,7 @@ public class PaymentChannelClaim: BaseTransaction {
         super.init(account: "", transactionType: "PaymentChannelClaim")
     }
 
-    override public init(json: [String: AnyObject]) throws {
+    public required init(json: [String: AnyObject]) throws {
         let decoder = JSONDecoder()
         let data: Data = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
         let decoded = try decoder.decode(PaymentChannelClaim.self, from: data)

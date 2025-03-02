@@ -55,7 +55,16 @@ public class SetHook: BaseTransaction {
         namespace = try values.decode(String.self, forKey: .namespace)
         try super.init(from: decoder)
     }
-
+    
+    public required init(json: [String : AnyObject]) throws {
+        let decoder = JSONDecoder()
+        let data: Data = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
+        let decoded = try decoder.decode(SetHook.self, from: data)
+        self.stateKey = decoded.stateKey
+        self.namespace = decoded.namespace
+        try super.init(json: json)
+    }
+    
     override public func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try super.encode(to: encoder)

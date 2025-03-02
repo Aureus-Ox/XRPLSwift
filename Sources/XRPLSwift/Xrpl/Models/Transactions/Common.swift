@@ -232,7 +232,7 @@ public class BaseTransaction: Codable {
         self.txnSignature = txnSignature
     }
 
-    public init(json: [String: AnyObject]) throws {
+    public required init(json: [String: AnyObject]) throws {
         let decoder = JSONDecoder()
         let data: Data = try! JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
         let decoded = try decoder.decode(BaseTransaction.self, from: data)
