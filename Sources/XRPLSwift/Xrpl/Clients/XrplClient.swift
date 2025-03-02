@@ -638,6 +638,16 @@ public class XrplClient: ConnectionDelegate {
         )
     }
 
+    // We should phase out `Transaction` in liu of BaseTransaction. No need to wrap in an enum,
+    // makes for bad abstraction.
+    public func submit(transaction: BaseTransaction, opts: SubmitOptions?) async throws -> EventLoopFuture<Any> {
+        return try await XRPLSwift.submit(
+            self,
+            transaction,
+            opts?.failHard
+        )
+    }
+
     public func submit(transaction: String, opts: SubmitOptions?) async throws -> EventLoopFuture<Any> {
         return try await XRPLSwift.submit(
             self,

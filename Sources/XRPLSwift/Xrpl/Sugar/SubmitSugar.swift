@@ -89,6 +89,31 @@ func submit(
     return try await submitRequest(client, signedTx, failHard)
 }
 
+/**
+ Submits a signed/unsigned transaction.
+ Steps performed on a transaction:
+     1. Autofill.
+     2. Sign & Encode.
+     3. Submit.
+ - parameters:
+    - client: A Client.
+    - transaction: A transaction to autofill, sign & encode, and submit.
+    - autofill: If true, autofill a transaction.
+    - failHard: If true, and the transaction fails locally, do not retry or relay the transaction to other servers.
+    - wallet: A wallet to sign a transaction. It must be provided when submitting an unsigned transaction.
+ - returns:
+ A promise that contains SubmitResponse.
+ - throws:
+ RippledError if submit request fails.
+ */
+func submit(
+    _ client: XrplClient,
+    _ transaction: BaseTransaction,
+    _ failHard: Bool? = false
+) async throws -> EventLoopFuture<Any> {
+    return try await submitRequest(client, transaction, failHard)
+}
+
 func submit(
     _ client: XrplClient,
     _ transaction: String,
@@ -147,6 +172,25 @@ func submitAndWait(
 func submitRequest(
     _ client: XrplClient,
     _ signedTransaction: Transaction,
+    _ failHard: Bool? = false
+    // ) async throws -> EventLoopFuture<SubmitResponse> {
+) async throws -> EventLoopFuture<Any> {
+    if !isSigned(try signedTransaction.toJson()) {
+        throw ValidationError("Transaction must be signed")
+    }
+    let signedTxEncoded: String = try BinaryCodec.encode(signedTransaction.toJson())
+    let request = SubmitRequest(
+        txBlob: signedTxEncoded,
+        //        failHard: isAccountDelete(transaction: signedTransaction) || failHard!
+        failHard: failHard!
+    )
+    return try await client.request(req: request)!
+}
+
+// Encodes and submits a signed transaction.
+func submitRequest(
+    _ client: XrplClient,
+    _ signedTransaction: BaseTransaction,
     _ failHard: Bool? = false
     // ) async throws -> EventLoopFuture<SubmitResponse> {
 ) async throws -> EventLoopFuture<Any> {
@@ -278,6 +322,7 @@ func getSignedTx(
     }
     return try wallet.sign(tx, false).txBlob
 }
+
 func getSignedTx(
     _ client: XrplClient,
     _ transaction: Transaction,
