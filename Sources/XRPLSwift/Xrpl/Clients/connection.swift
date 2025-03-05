@@ -16,6 +16,7 @@ import FoundationNetworking
 #if canImport(CoreFoundation)
 import CoreFoundation
 #endif
+import os
 
 // ----------------------------------------------------------------------------------
 
@@ -135,36 +136,9 @@ public let INTENTIONAL_DISCONNECT_CODE = 4000 // swiftlint:disable:this identifi
  A Websocket that fits the given configuration parameters.
  */
 public func createWebSocket(
-    url: String,
-    config: ConnectionOptions
+    url: String
 ) -> WebSocketClient? {
-    //    let options: WebSocket.ClientOptions = [:]
-    //    options.agent = getAgent(url, config)
-    //    if config.headers != nil {
-    //        options.headers = config.headers
-    //    }
-    //    if config.authorization != nil {
-    //        let base64 = Data(from: config.authorization).base64EncodedString()
-    //        options.headers = [
-    //            ...options.headers,
-    //            "Authorization": "Basic \(base64)"
-    //        ]
-    //    }
-    let optionsOverrides = [
-        "ca": config.trustedCertificates,
-        "key": config.key,
-        "passphrase": config.passphrase,
-        "cert": config.certificate
-    ] as [String: Any]
-    let websocketOptions = optionsOverrides
     let client = WebSocketClient(eventLoopGroupProvider: .shared(connEventGroup))
-    /*
-     * we will have a listener for each outstanding request,
-     * so we have to raise the limit (the default is 10)
-     */
-    //    if typeof websocket.setMaxListeners == "function" {
-    //        websocket.setMaxListeners(1000000)
-    //    }
     return client
 }
 
@@ -204,7 +178,7 @@ public protocol WebsocketResponding: AnyObject {
     func connect() async throws -> EventLoopFuture<Any>
     func disconnect() async -> EventLoopFuture<Any?>
     func reconnect() async throws
-    
+
     func request<R: BaseRequest>(request: R, timeout: Int?) async throws -> EventLoopFuture<Any>
     func getUrl() async -> String
 }
@@ -214,19 +188,23 @@ public protocol WebsocketResponding: AnyObject {
  an active WebSocket connection to a XRPL node.
  */
 public actor Connection: Sendable, WebsocketResponding {
-    internal var trace: ConsoleLog?
+    var trace: ConsoleLog?
 
-    internal let url: String?
-    internal var ws: WebSocket?
+    let url: String?
+    var ws: WebSocket?
     private var reconnectTimeoutID: Timer?
     private var heartbeatIntervalID: Timer?
     private let retryConnectionBackoff = ExponentialBackoff(
         opts: ExponentialBackoffOptions(min: 100, max: SECONDS_PER_MINUTE * 1000)
     )
 
-    internal let config: ConnectionOptions
+    let config: ConnectionOptions
     private let requestManager = RequestManager()
     private let connectionManager = ConnectionManager()
+    private let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "",
+        category: String(describing: Connection.self)
+    )
 
     /**
      Creates a new Connection object.
@@ -306,7 +284,10 @@ public actor Connection: Sendable, WebsocketResponding {
             throw ConnectionError("Connection: invalid port")
         }
 
-        let client: WebSocketClient = createWebSocket(url: url, config: self.config)!
+        guard let client: WebSocketClient = createWebSocket(url: url) else {
+            throw ConnectionError("Failed to create client")
+        }
+
         let connectionLoopFuture = client.connect(scheme: isscheme, host: ishost, port: port, onUpgrade: { ws -> Void in
             Task {
                 await self.setWebSocket(ws: ws)
@@ -342,7 +323,8 @@ public actor Connection: Sendable, WebsocketResponding {
      */
     public func disconnect() async -> EventLoopFuture<Any?> {
         let promise = connEventGroup.next().makePromise(of: Any?.self)
-        //            self.clearHeartbeatInterval()
+        self.clearHeartbeatInterval()
+
         if self.reconnectTimeoutID != nil {
             self.reconnectTimeoutID?.invalidate()
             self.reconnectTimeoutID = nil
@@ -359,7 +341,6 @@ public actor Connection: Sendable, WebsocketResponding {
         }
         if self.ws != nil {
             promise.succeed(1000)
-            //            self.ws.once("close", (code) => resolve(code))
         }
         /*
          * Connection already has a disconnect handler for the disconnect logic.
@@ -404,12 +385,11 @@ public actor Connection: Sendable, WebsocketResponding {
         guard self.shouldBeConnected, let ws = self.ws else {
             throw NotConnectedError("Not Connected")
         }
-        let (id, message, responsePromise) = try! self.requestManager.createRequest(
+        let (_, message, responsePromise) = try! self.requestManager.createRequest(
             request: request,
-            //            timeout: timeout ?? self.config.timeout,
-            timeout: 10
+            timeout: timeout ?? self.config.timeout ?? 10
         )
-        //        self.trace("send", message)
+
         _ = await websocketSendAsync(ws: ws, message: message)
         return responsePromise
     }
@@ -429,7 +409,6 @@ public actor Connection: Sendable, WebsocketResponding {
      - message: The message received from the server.
      */
     private func onMessage(data: Data) {
-        //        self.trace("receive", message)
         var dict: [String: AnyObject] = [:]
         do {
             dict = try JSONSerialization.jsonObject(with: data, options: .mutableLeaves) as! [String: AnyObject]
@@ -473,7 +452,11 @@ public actor Connection: Sendable, WebsocketResponding {
      - message: The message received from the server.
      */
     private func onMessage(message: String) {
-        let data: Data = message.data(using: .utf8)!
+        guard let data: Data = message.data(using: .utf8) else {
+            // Fail silently
+            logger.warning("Failed to parse message as UTF-8: \(message)")
+            return
+        }
         self.onMessage(data: data)
     }
 
@@ -510,95 +493,45 @@ public actor Connection: Sendable, WebsocketResponding {
     }
 
     private func setHandlers() {
-        // Add new, long-term connected listeners for messages and errors
         self.ws?.onText({ _, message in
             await self.onMessage(message: message)
         })
 
-        // TESTING ONLY
-        // TODO: This function is only used in the MockRippled Testing Response
         self.ws?.onBinary({ _, message in
             let data = Data(buffer: message)
             await self.onMessage(data: data)
         })
-        //        self.ws.on("error", (error) =>
-        //            self.emit("error", "websocket", error.message, error),
-        //        )
+
         // Handle a closed connection: reconnect if it was unexpected
         _ = self.ws?.onClose.map { _ in
-            let reason: String = "none"
-            let code: Int? = 0
             
-            Task {
-                if await self.socketIsOpen() {
+            // TODO: - THIS REASON AND CODE ARENT SET FROM ANYWHERE. FIGURE OUT WHAT TO DO HERE
+            var reason: String = "none"
+            var code: Int = 0
+            
+            Task { [weak self] in
+                guard let self else { return }
+
+                if await socketIsOpen() {
                     NSLog("UNMPLEMENTED")
                     return
                 }
-                await self.clearHeartbeatInterval()
-                try? await self.requestManager.rejectAll(error: DisconnectedError("websocket was closed, \(reason)"))
-                
+                await clearHeartbeatInterval()
+                try? await requestManager.rejectAll(error: DisconnectedError("websocket was closed, \(reason)"))
+
                 await self.setWebSocket(ws: nil)
 
-                if code == nil {
-                    let reasonText = reason
-                    // swiftlint:disable:next line_length
-                    NSLog("Disconnected but the disconnect code was undefined (The given reason was \(reasonText)). This could be caused by an exception being thrown during a `connect` callback. Disconnecting with code 1011 to indicate an internal error has occurred.")
-
-                    /*
-                     * Error code 1011 represents an Internal Error according to
-                     * https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code
-                     */
-                    let internalErrorCode = 1011
-                    //                self.emit("disconnected", internalErrorCode)
-                    print("disconnected: \(internalErrorCode)")
-                } else {
-                    //                self.emit("disconnected", code)
-                    guard let code = code else { return }
-                    print("disconnected: \(code)")
-                }
+                logger.warning("Websocket disconnected with code \(String(describing: code)): \(reason)")
 
                 /*
                  * If this wasn"t a manual disconnect, then lets reconnect ASAP.
                  * Code can be undefined if there"s an exception while connecting.
+                 *
+                 * NOTE: This doesn't do anything since the error code is never set
                  */
-                if code != INTENTIONAL_DISCONNECT_CODE && code != nil {
+                if code != INTENTIONAL_DISCONNECT_CODE {
                     await self.intentionalDisconnect()
                 }
-            }
-        }
-    }
-
-    /**
-     Handler for what to do once the connection to the server is open.
-     - parameters:
-     - connectionTimeoutID: Timeout in case the connection hangs longer than expected.
-     - returns:
-     A promise that resolves to void when the connection is fully established.
-     - throws:
-     Error if the websocket initialized is somehow null.
-     */
-    private func onceOpen(connectionTimeoutID: Timer) async throws {
-        if self.ws == nil {
-            throw ConnectionError("onceOpen: ws is nil")
-        }
-
-        // Once the connection completes successfully, remove all old listeners
-        //        self.ws.removeAllListeners()
-        connectionTimeoutID.invalidate()
-
-        // Finalize the connection and resolve all awaiting connect() requests
-        do {
-            self.retryConnectionBackoff.reset()
-            self.startHeartbeatInterval()
-            self.connectionManager.resolveAllAwaiting()
-            //                self.emit("connected")
-            NSLog("connected")
-        } catch {
-            print(error.localizedDescription)
-            if error is Error {
-                self.connectionManager.rejectAllAwaiting(error: error)
-                // Ignore this error, propagate the root cause.
-                await self.disconnect()
             }
         }
     }
@@ -616,7 +549,7 @@ public actor Connection: Sendable, WebsocketResponding {
         let retryTimeout: Int = self.retryConnectionBackoff.duration()
         //            self.trace("reconnect", "Retrying connection in \(retryTimeout)ms.")
         //            self.emit("reconnecting", self.retryConnectionBackoff.attempts)
-        NSLog("reconnecting: \(String(describing: self.retryConnectionBackoff.attempts)))")
+        logger.log("reconnecting: \(String(describing: self.retryConnectionBackoff.attempts)))")
         /*
          * Start the reconnect timeout, but set it to `this.reconnectTimeoutID`
          * so that we can cancel one in-progress on disconnect.
