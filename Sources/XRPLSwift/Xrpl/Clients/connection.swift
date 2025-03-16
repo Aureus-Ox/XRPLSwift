@@ -609,17 +609,17 @@ public actor Connection: Sendable, WebsocketResponding {
      - parameters:
      - errorOrCode: (Optional) Error or code for connection failure.
      */
-    private func onConnectionFailed(errorOrCode: Error) {
+    private func onConnectionFailed(errorOrCode: Error) async {
         if self.ws != nil {
             //            self.ws.removeAllListeners()
-            _ = self.ws?.close()
+            _ = try? await self.ws?.close()
             self.ws = nil
         }
         if !errorOrCode.localizedDescription.isEmpty {
             //            self.connectionManager.rejectAllAwaiting(error: NotConnectedError.connection(errorOrCode.localizedDescription, errorOrCode))
-            self.connectionManager.rejectAllAwaiting(error: NotConnectedError(errorOrCode.localizedDescription))
+            await self.connectionManager.rejectAllAwaiting(error: NotConnectedError(errorOrCode.localizedDescription))
         } else {
-            self.connectionManager.rejectAllAwaiting(error: NotConnectedError("Connection failed."))
+            await self.connectionManager.rejectAllAwaiting(error: NotConnectedError("Connection failed."))
         }
     }
 
@@ -628,13 +628,13 @@ public actor Connection: Sendable, WebsocketResponding {
      - parameters:
      - errorOrCode: (Optional) Error or code for connection failure.
      */
-    private func onConnectionFailed(errorOrCode: Int) {
+    private func onConnectionFailed(errorOrCode: Int) async {
         if self.ws != nil {
             //            self.ws.removeAllListeners()
-            _ = self.ws?.close()
+            _ = try? await self.ws?.close()
             self.ws = nil
         }
-        self.connectionManager.rejectAllAwaiting(
+        await self.connectionManager.rejectAllAwaiting(
             //            error: NotConnectedError("Connection failed with code \(errorOrCode).", code: errorOrCode),
             error: NotConnectedError("Connection failed with code \(errorOrCode).")
         )
