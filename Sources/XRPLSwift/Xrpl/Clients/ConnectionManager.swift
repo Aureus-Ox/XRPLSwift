@@ -29,11 +29,11 @@ public class ConnectionManager {
     /**
      * Resolves all awaiting connections.
      */
-    public func resolveAllAwaiting() {
+    public func resolveAllAwaiting() async {
         _ = self.promisesAwaitingConnection.map { resolve in
             resolve.succeed("")
         }
-        self.promisesAwaitingConnection = []
+        self.promisesAwaitingConnection.removeAll()
     }
 
     /**
@@ -41,11 +41,11 @@ public class ConnectionManager {
      *
      * @param error - Error to throw in the rejection.
      */
-    public func rejectAllAwaiting(error: Error) {
+    public func rejectAllAwaiting(error: Error) async {
         _ = self.promisesAwaitingConnection.map { resolve in
             resolve.fail(error)
         }
-        self.promisesAwaitingConnection = []
+        self.promisesAwaitingConnection.removeAll()
     }
 
     /**
