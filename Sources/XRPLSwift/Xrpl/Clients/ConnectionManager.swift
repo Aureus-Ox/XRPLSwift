@@ -47,6 +47,14 @@ public class ConnectionManager {
         }
         self.promisesAwaitingConnection.removeAll()
     }
+    
+    /**
+     * Check for awaiting connection
+     *
+     */
+    public func hasAwaitingConnection() -> Bool {
+        return self.promisesAwaitingConnection.count > 0
+    }
 
     /**
      * Await a new connection.

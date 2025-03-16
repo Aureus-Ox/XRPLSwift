@@ -249,10 +249,11 @@ public actor Connection: Sendable, WebsocketResponding {
      ConnectionError if there is a connection error, RippleError if there is already a WebSocket in existence.
      */
     public func connect() async throws -> EventLoopFuture<Any> {
+        
         //        let promise = connEventGroup.next().makePromise(of: Any.self)
         //        if self.isConnected() {
         //            return promise.futureResult
-        //        }
+        //          }
         //        if self.state == .closed {
         //            return await self.connectionManager.awaitConnection()
         //        }
@@ -263,6 +264,9 @@ public actor Connection: Sendable, WebsocketResponding {
         //            // missing state
         //            promise.fail(XrplError("Websocket connection never cleaned up."))
         //        }
+        guard !connectionManager.hasAwaitingConnection() else {
+            throw ConnectionError("Awaiting connection")
+        }
 
         // Create the connection timeout, in case the connection hangs longer than expected.
         // Connection listeners: these stay attached only until a connection is done/open.
