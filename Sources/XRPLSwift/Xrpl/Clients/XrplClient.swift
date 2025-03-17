@@ -643,8 +643,7 @@ public class XrplClient: ConnectionDelegate {
     public func submit(transaction: BaseTransaction, opts: SubmitOptions?) async throws -> EventLoopFuture<Any> {
         return try await XRPLSwift.submit(
             self,
-            transaction,
-            opts?.failHard
+            transaction
         )
     }
 
