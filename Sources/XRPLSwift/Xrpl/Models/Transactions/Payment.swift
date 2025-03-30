@@ -71,8 +71,10 @@ public class Payment: BaseTransaction, XrplTransaction {
      <http://xrpl.local/payment.html#types-of-payments>`_.
      Payments are also the only way to `create accounts
      <http://xrpl.local/payment.html#creating-accounts>`_.
+     
+     Amount is an Alias to DeliverMax in V2.
+     We can just change the key for encoding and decoding here
      */
-
     public var amount: Amount
     /*
      The amount of currency to deliver. If the Partial Payment flag is set,
@@ -122,7 +124,7 @@ public class Payment: BaseTransaction, XrplTransaction {
      */
 
     enum CodingKeys: String, CodingKey {
-        case amount = "Amount"
+        case amount = "DeliverMax"
         case destination = "Destination"
         case destinationTag = "DestinationTag"
         case invoiceId = "InvoiceID"
