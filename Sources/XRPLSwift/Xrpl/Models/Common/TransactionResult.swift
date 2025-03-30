@@ -8,7 +8,7 @@
 import Foundation
 
 
-public enum TransactionResult: Codable {
+public enum TransactionResult: String, Codable {
     case tesSUCCESS
     
     case terINSUF_FEE_B
@@ -155,4 +155,6 @@ public enum TransactionResult: Codable {
     case tecUNFUNDED_ADD
     case tecUNFUNDED_PAYMENT
     case tecUNFUNDED_OFFER
+    
+    // TODO: - Add utility to match codes from DefinitionJson
 }
