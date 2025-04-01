@@ -28,6 +28,9 @@ public func getFeeXrp(
     let feeCushion = cushion ?? client.feeCushion
 
     let request = ServerInfoRequest()
+
+    guard await client.isConnected() else { throw XrplError("Not Connected") }
+    
     let response = try await client.request(request).get()
     guard let response = response as? BaseResponse<ServerInfoResponse> else { throw XrplError("Invalid Response") }
     guard let result = response.result else { throw XrplError("Invalid Result") }
