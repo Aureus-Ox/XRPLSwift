@@ -1218,6 +1218,16 @@ let serializerDefinitions = """
       }
     ],
     [
+      "DeliverMax",
+      {
+        "nth": 1,
+        "isVLEncoded": false,
+        "isSerialized": true,
+        "isSigningField": true,
+        "type": "Amount"
+      }
+    ],
+    [
       "Balance",
       {
         "nth": 2,
