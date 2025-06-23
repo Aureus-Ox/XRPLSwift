@@ -140,7 +140,8 @@ public class Payment: BaseTransaction, XrplTransaction {
         invoiceId: String? = nil,
         paths: [Path]? = nil,
         sendMax: Amount? = nil,
-        deliverMin: Amount? = nil
+        deliverMin: Amount? = nil,
+        memos: [MemoWrapper]? = nil
     ) {
         self.amount = amount
         self.destination = destination
@@ -149,7 +150,7 @@ public class Payment: BaseTransaction, XrplTransaction {
         self.paths = paths
         self.sendMax = sendMax
         self.deliverMin = deliverMin
-        super.init(account: "", transactionType: "Payment")
+        super.init(account: "", transactionType: "Payment", memos: memos)
     }
 
     public required init(json: [String: AnyObject]) throws {
