@@ -170,7 +170,11 @@ public class Payment: BaseTransaction, XrplTransaction {
 
     public required init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
-        amount = try values.decode(Amount.self, forKey: .amount)
+        if let deliverMax = try? values.decode(Amount.self, forKey: .deliverMax) {
+            amount = deliverMax
+        } else {
+            amount = try values.decode(Amount.self, forKey: .amount)
+        }
         destination = try values.decode(String.self, forKey: .destination)
         destinationTag = try values.decodeIfPresent(Int.self, forKey: .destinationTag)
         invoiceId = try values.decodeIfPresent(String.self, forKey: .invoiceId)
