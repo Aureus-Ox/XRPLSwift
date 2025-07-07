@@ -124,7 +124,8 @@ public class Payment: BaseTransaction, XrplTransaction {
      */
 
     enum CodingKeys: String, CodingKey {
-        case amount = "DeliverMax"
+        case amount = "Amount"
+        case deliverMax = "DeliverMax"
         case destination = "Destination"
         case destinationTag = "DestinationTag"
         case invoiceId = "InvoiceID"
@@ -182,7 +183,7 @@ public class Payment: BaseTransaction, XrplTransaction {
     override public func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try super.encode(to: encoder)
-        try values.encode(amount, forKey: .amount)
+        try values.encode(amount, forKey: .deliverMax)
         try values.encode(destination, forKey: .destination)
         if let destinationTag = destinationTag { try values.encode(destinationTag, forKey: .destinationTag) }
         if let invoiceId = invoiceId { try values.encode(invoiceId, forKey: .invoiceId) }
