@@ -11,7 +11,8 @@ import Foundation
 import NIO
 
 /// Approximate time for a ledger to close, in milliseconds
-let LEDGER_CLOSE_TIME: UInt32 = 4000 // swiftlint:disable:this identifier_name
+let LEDGER_CLOSE_TIME_MILLI: UInt32 = 3000 // swiftlint:disable:this identifier_name
+let LEDGER_CLOSE_TIME: UInt32 = 4 // swiftlint:disable:this identifier_name
 
 public enum SubmitTransaction: Codable {
     case tx(Transaction)

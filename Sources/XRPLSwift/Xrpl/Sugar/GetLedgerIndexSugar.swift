@@ -21,6 +21,6 @@ public func getLedgerIndex(_ client: XrplClient) async throws -> Int {
     else {
         return 0
     }
-    
+
     return ledgerIndex
 }
