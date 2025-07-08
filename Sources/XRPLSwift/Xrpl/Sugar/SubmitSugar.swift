@@ -246,7 +246,7 @@ func submitRequest(
      // Approximated ledger close time
      sleep(LEDGER_CLOSE_TIME)
      
-     var latestLedger = try await client.getLedgerIndex()
+     let latestLedger = try await client.getLedgerIndex()
      
      if (lastLedger < latestLedger) {
          throw XrplError(
