@@ -141,9 +141,7 @@ func submit(
 func submitAndWait(
     _ client: XrplClient,
     _ transaction: BaseTransaction,
-    _ autofill: Bool? = false,
-    _ failHard: Bool? = false,
-    _ wallet: Wallet?
+    _ failHard: Bool? = false
 ) async throws -> BaseResponse<SubmitResponse> {
     guard let lastLedger = getLastLedgerSequence(transaction) else {
         throw ValidationError("Transaction must contain a LastLedgerSequence value for reliable submission.")
@@ -339,7 +337,7 @@ func getSignedTx(
         throw ValidationError("Wallet must be provided when submitting an unsigned transaction")
     }
     //    var tx = try transaction.toAny() as! BaseTransaction
-    var tx = try transaction.toJson() as! [String: AnyObject]
+    var tx = try transaction.toJson()
     if autofill {
         tx = try await AutoFillSugar().autofill(client, tx, 0).get()
     }

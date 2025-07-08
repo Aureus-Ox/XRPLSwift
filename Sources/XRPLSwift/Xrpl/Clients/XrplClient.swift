@@ -660,10 +660,7 @@ public class XrplClient: ConnectionDelegate {
     public func submitAndWait(transaction: BaseTransaction, opts: SubmitOptions?) async throws -> BaseResponse<SubmitResponse> {
         return try await XRPLSwift.submitAndWait(
             self,
-            transaction,
-            opts?.autofill,
-            opts?.failHard,
-            opts?.wallet
+            transaction
         )
     }
     
