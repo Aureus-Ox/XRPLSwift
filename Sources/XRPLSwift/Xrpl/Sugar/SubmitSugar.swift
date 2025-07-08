@@ -11,7 +11,7 @@ import Foundation
 import NIO
 
 /// Approximate time for a ledger to close, in milliseconds
-let LEDGER_CLOSE_TIME = 4000 // swiftlint:disable:this identifier_name
+let LEDGER_CLOSE_TIME: UInt32 = 4000 // swiftlint:disable:this identifier_name
 
 public enum SubmitTransaction: Codable {
     case tx(Transaction)
@@ -140,32 +140,37 @@ func submit(
  */
 func submitAndWait(
     _ client: XrplClient,
-    //  transaction: Transaction | string,
-    _ transaction: Transaction,
-    _ opts: SubmitOptions? = nil
-    // ) async throws -> EventLoopFuture<TxResponse> {
-) async throws -> String {
-    let signedTx = try await getSignedTx(
-        client,
-        transaction,
-        opts?.autofill ?? false,
-        opts?.wallet
-    )
+    _ transaction: String,
+    _ autofill: Bool? = false,
+    _ failHard: Bool? = false,
+    _ wallet: Wallet?
+) async throws -> BaseResponse<SubmitResponse> {
+    let signedTx = try await getSignedTx(client, transaction, autofill ?? false, wallet)
 
-    let lastLedger: Int? = getLastLedgerSequence(signedTx)
-    if lastLedger == nil {
+    guard let lastLedger = getLastLedgerSequence(signedTx) else {
         throw ValidationError("Transaction must contain a LastLedgerSequence value for reliable submission.")
     }
 
-    let response = try await submitRequest(client, signedTx, opts?.failHard)
-    //    let txHash = opts?.hashes.hashSignedTx(signedTx)
-    //    return waitForFinalTransactionOutcome(
-    //        this,Int
-    //        txHash,
-    //        lastLedger,
-    //        response.result.engine_result,
-    //    )
-    return ""
+    let response = try await submitRequest(client, signedTx, failHard).get()
+    
+    guard let result = response as? BaseResponse<SubmitResponse>,
+          let transactionJson = try? result.result?.txJson.toJson(),
+          transactionJson.contains(where: { $0.key == "hash" }),
+          transactionJson.contains(where: { $0.key == "engine_result"}),
+          let txHash = transactionJson["hash"] as? String,
+          let engineResult = transactionJson["engine_result"] as? String
+    else {
+        throw ValidationError("Transaction must contain a hash value for reliable submission.")
+    }
+
+    _ = try await waitForFinalTransactionOutcome(
+        client: client,
+        txHash: txHash,
+        lastLedger: lastLedger,
+        submissionResult: engineResult
+    )
+    
+    return result
 }
 
 // Encodes and submits a signed transaction.
@@ -232,58 +237,56 @@ func submitRequest(
 // * latest ledger sequence (meaning it will never be included in a validated ledger).
 // */
 //// eslint-disable-next-line max-params, max-lines-per-function -- this function needs to display and do with more information.
-// func waitForFinalTransactionOutcome(
-//  client: Client,
-//  txHash: string,
-//  lastLedger: number,
-//  submissionResult: string,
-// ) -> async EventLoopFuture<TxResponse> {
-//  await sleep(LEDGER_CLOSE_TIME)
-//
-//  const latestLedger = await client.getLedgerIndex()
-//
-//  if (lastLedger < latestLedger) {
-//    throw new XrplError(
-//      `The latest ledger sequence ${latestLedger} is greater than the transaction"s LastLedgerSequence (${lastLedger}).\n` +
-//        `Preliminary result: ${submissionResult}`,
-//    )
-//  }
-//
-//  const txResponse = await client
-//    .request({
-//      command: "tx",
-//      transaction: txHash,
-//    })
-//    .catch(async (error) => {
-//      // error is of an unknown type and hence we assert type to extract the value we need.
-//      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions,@typescript-eslint/no-unsafe-member-access -- ^
-//      const message = error?.data?.error as string
-//      if (message === "txnNotFound") {
-//        return waitForFinalTransactionOutcome(
-//          client,
-//          txHash,
-//          lastLedger,
-//          submissionResult,
-//        )
-//      }
-//      throw new Error(
-//        `${message} \n Preliminary result: ${submissionResult}.\nFull error details: ${String(
-//          error,
-//        )}`,
-//      )
-//    })
-//
-//  if (txResponse.result.validated) {
-//    return txResponse
-//  }
-//
-//  return waitForFinalTransactionOutcome(
-//    client,
-//    txHash,
-//    lastLedger,
-//    submissionResult,
-//  )
-// }
+ func waitForFinalTransactionOutcome(
+  client: XrplClient,
+  txHash: String,
+  lastLedger: Int,
+  submissionResult: String
+ ) async throws -> TxResponse {
+     // Approximated ledger close time
+     sleep(LEDGER_CLOSE_TIME)
+     
+     var latestLedger = try await client.getLedgerIndex()
+     
+     if (lastLedger < latestLedger) {
+         throw XrplError(
+            "The latest ledger sequence \(latestLedger) is greater than the transaction's LastLedgerSequence (\(lastLedger)). Preliminary result: \(submissionResult)",
+         )
+     }
+     
+     let txRequest = TxRequest(transaction: txHash)
+     let txResponse = try await client.request(txRequest).get()
+
+     if let response = txResponse as? BaseResponse<TxResponse> {
+         guard let result = response.result, let validated = result.validated else {
+             throw XrplError("Unexpected Tx Result")
+         }
+    
+         if validated {
+             return result
+         }
+         
+         return try await waitForFinalTransactionOutcome(
+            client: client,
+            txHash: txHash,
+            lastLedger: lastLedger,
+            submissionResult: submissionResult,
+         )
+     } else if let response = txResponse as? ErrorResponse {
+         if response.error.contains("txnNotFound") {
+             return try await waitForFinalTransactionOutcome(
+                client: client,
+                txHash: txHash,
+                lastLedger: lastLedger,
+                submissionResult: submissionResult,
+             )
+         }
+         
+         throw XrplError("Unexpected Error: \(response.error)")
+     } else {
+         throw XrplError("Invalid Tx Response")
+     }
+ }
 
 // checks if the transaction has been signed
 func isSigned(_ transaction: String) -> Bool {

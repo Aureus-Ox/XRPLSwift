@@ -662,7 +662,7 @@ public class XrplClient: ConnectionDelegate {
     //    public submitAndWait = submitAndWait
     //
     public func getXrpBalance(address: String) async throws -> String {
-        return try await XRPLSwift.getXrpBalance(self, address)
+        return await XRPLSwift.getXrpBalance(self, address)
     }
     //    /**
     //     * @category Abstraction
