@@ -140,18 +140,16 @@ func submit(
  */
 func submitAndWait(
     _ client: XrplClient,
-    _ transaction: String,
+    _ transaction: BaseTransaction,
     _ autofill: Bool? = false,
     _ failHard: Bool? = false,
     _ wallet: Wallet?
 ) async throws -> BaseResponse<SubmitResponse> {
-    let signedTx = try await getSignedTx(client, transaction, autofill ?? false, wallet)
-
-    guard let lastLedger = getLastLedgerSequence(signedTx) else {
+    guard let lastLedger = getLastLedgerSequence(transaction) else {
         throw ValidationError("Transaction must contain a LastLedgerSequence value for reliable submission.")
     }
 
-    let response = try await submitRequest(client, signedTx, failHard).get()
+    let response = try await submitRequest(client, transaction, failHard).get()
     
     guard let result = response as? BaseResponse<SubmitResponse>,
           let transactionJson = try? result.result?.txJson.toJson(),
@@ -356,8 +354,13 @@ func getLastLedgerSequence(_ transaction: String) -> Int? {
 
 // checks if there is a LastLedgerSequence as a part of the transaction
 func getLastLedgerSequence(_ transaction: Transaction) -> Int? {
-    let tx = try! transaction.toJson() as! [String: AnyObject]
-    return tx["LastLedgerSequence"] as? Int
+    let tx = try? transaction.toJson()
+    return tx?["LastLedgerSequence"] as? Int
+}
+
+// checks if there is a LastLedgerSequence as a part of the transaction
+func getLastLedgerSequence(_ transaction: BaseTransaction) -> Int? {
+    return transaction.lastLedgerSequence
 }
 
 // checks if the transaction is an AccountDelete transaction
