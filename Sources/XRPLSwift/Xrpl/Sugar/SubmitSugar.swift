@@ -151,10 +151,9 @@ func submitAndWait(
     
     guard let result = response as? BaseResponse<SubmitResponse>,
           let transactionJson = try? result.result?.txJson.toJson(),
+          let engineResult = result.result?.engineResult,
           transactionJson.contains(where: { $0.key == "hash" }),
-          transactionJson.contains(where: { $0.key == "engine_result"}),
-          let txHash = transactionJson["hash"] as? String,
-          let engineResult = transactionJson["engine_result"] as? String
+          let txHash = transactionJson["hash"] as? String
     else {
         throw ValidationError("Transaction must contain a hash value for reliable submission.")
     }
@@ -165,7 +164,7 @@ func submitAndWait(
         lastLedger: lastLedger,
         submissionResult: engineResult
     )
-    
+
     return result
 }
 
