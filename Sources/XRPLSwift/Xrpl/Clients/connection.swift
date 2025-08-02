@@ -298,10 +298,11 @@ public actor Connection: Sendable, WebsocketResponding {
                 await self.setHandlers()
 
                 if await self.ws == nil {
+                    await self.connectionManager.rejectAllAwaiting(error: ConnectionError("Connect: created null websocket"))
                     throw ConnectionError("Connect: created null websocket")
                 }
 
-                await self.retryConnectionBackoff.reset()
+                self.retryConnectionBackoff.reset()
                 await self.startHeartbeatInterval()
                 await self.connectionManager.resolveAllAwaiting()
 
@@ -507,7 +508,7 @@ public actor Connection: Sendable, WebsocketResponding {
         })
 
         // Handle a closed connection: reconnect if it was unexpected
-        _ = self.ws?.onClose.map { _ in
+        _ = self.ws?.onClose.map { value in
             
             // TODO: - THIS REASON AND CODE ARENT SET FROM ANYWHERE. FIGURE OUT WHAT TO DO HERE
             var reason: String = "none"
@@ -516,6 +517,7 @@ public actor Connection: Sendable, WebsocketResponding {
             Task { [weak self] in
                 guard let self else { return }
 
+                // This makes no sense
                 if await socketIsOpen() {
                     NSLog("UNMPLEMENTED")
                     return
