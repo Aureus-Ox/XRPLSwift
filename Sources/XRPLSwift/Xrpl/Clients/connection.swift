@@ -298,10 +298,11 @@ public actor Connection: Sendable, WebsocketResponding {
                 await self.setHandlers()
 
                 if await self.ws == nil {
+                    await self.connectionManager.rejectAllAwaiting(error: ConnectionError("Connect: created null websocket"))
                     throw ConnectionError("Connect: created null websocket")
                 }
 
-                await self.retryConnectionBackoff.reset()
+                self.retryConnectionBackoff.reset()
                 await self.startHeartbeatInterval()
                 await self.connectionManager.resolveAllAwaiting()
 
