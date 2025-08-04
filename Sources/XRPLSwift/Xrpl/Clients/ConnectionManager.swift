@@ -62,24 +62,26 @@ public class ConnectionManager {
      * @returns A promise for resolving the connection.
      */
     public func awaitConnection() async -> EventLoopFuture<Any> {
-        let future = eventGroup.next().makePromise(of: Any.self)
-        
-        let timeoutFuture = future.futureResult.timeout(
+        let eventLoop = eventGroup.next()
+        let promise = eventLoop.makePromise(of: Any.self)
+    
+        let timeoutPromise: EventLoopPromise<Any> = promise.futureResult.timeout(
             after: .seconds(2),
             on: eventLoop
         )
-        
-        self.promisesAwaitingConnection.append(future)
-        return future.futureResult
+
+        self.promisesAwaitingConnection.append(promise)
+        self.promisesAwaitingConnection.append(timeoutPromise)
+        return promise.futureResult
     }
 }
 
 extension EventLoopFuture {
-    func timeout(
+    func timeout<T: Any>(
         after time: TimeAmount,
         on eventLoop: EventLoop,
-        timeoutError: Error = TimeoutError()
-    ) -> EventLoopFuture<T> {
+        timeoutError: Error = TimeoutError("Future timeout", nil)
+    ) -> EventLoopPromise<T> {
         let promise = eventLoop.makePromise(of: T.self)
         
         // Schedule a task to fail the promise after the timeout period
@@ -87,13 +89,20 @@ extension EventLoopFuture {
             promise.fail(timeoutError)
         }
         
+        return promise
+        
         // Return the first future to complete (either the original or the timeout)
-        return self.flatMap { result in
-            promise.succeed(result)
-            return promise.futureResult
-        }.flatMapError { error in
-            promise.fail(error)
-            return promise.futureResult
-        }
+//        return self.flatMap { result in
+//            guard let anyResult = result as? T else {
+//                promise.fail(TimeoutError("Future timeout", nil))
+//                return promise.futureResult
+//            }
+//
+//            promise.succeed(anyResult)
+//            return promise.futureResult
+//        }.flatMapError { error in
+//            promise.fail(error)
+//            return promise.futureResult
+//        }
     }
 }
