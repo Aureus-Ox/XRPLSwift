@@ -62,8 +62,38 @@ public class ConnectionManager {
      * @returns A promise for resolving the connection.
      */
     public func awaitConnection() async -> EventLoopFuture<Any> {
-        let promise = eventGroup.next().makePromise(of: Any.self)
-        self.promisesAwaitingConnection.append(promise)
-        return promise.futureResult
+        let future = eventGroup.next().makePromise(of: Any.self)
+        
+        let timeoutFuture = future.futureResult.timeout(
+            after: .seconds(2),
+            on: eventLoop
+        )
+        
+        self.promisesAwaitingConnection.append(future)
+        return future.futureResult
+    }
+}
+
+extension EventLoopFuture {
+    func timeout(
+        after time: TimeAmount,
+        on eventLoop: EventLoop,
+        timeoutError: Error = TimeoutError()
+    ) -> EventLoopFuture<T> {
+        let promise = eventLoop.makePromise(of: T.self)
+        
+        // Schedule a task to fail the promise after the timeout period
+        eventLoop.scheduleTask(in: time) {
+            promise.fail(timeoutError)
+        }
+        
+        // Return the first future to complete (either the original or the timeout)
+        return self.flatMap { result in
+            promise.succeed(result)
+            return promise.futureResult
+        }.flatMapError { error in
+            promise.fail(error)
+            return promise.futureResult
+        }
     }
 }
