@@ -65,44 +65,11 @@ public class ConnectionManager {
         let eventLoop = eventGroup.next()
         let promise = eventLoop.makePromise(of: Any.self)
     
-        let timeoutPromise: EventLoopPromise<Any> = promise.futureResult.timeout(
-            after: .seconds(2),
-            on: eventLoop
-        )
+        eventLoop.scheduleTask(in: .seconds(2)) {
+            promise.fail(TimeoutError("Connection timeout", nil))
+        }
 
         self.promisesAwaitingConnection.append(promise)
-        self.promisesAwaitingConnection.append(timeoutPromise)
         return promise.futureResult
-    }
-}
-
-extension EventLoopFuture {
-    func timeout<T: Any>(
-        after time: TimeAmount,
-        on eventLoop: EventLoop,
-        timeoutError: Error = TimeoutError("Future timeout", nil)
-    ) -> EventLoopPromise<T> {
-        let promise = eventLoop.makePromise(of: T.self)
-        
-        // Schedule a task to fail the promise after the timeout period
-        eventLoop.scheduleTask(in: time) {
-            promise.fail(timeoutError)
-        }
-        
-        return promise
-        
-        // Return the first future to complete (either the original or the timeout)
-//        return self.flatMap { result in
-//            guard let anyResult = result as? T else {
-//                promise.fail(TimeoutError("Future timeout", nil))
-//                return promise.futureResult
-//            }
-//
-//            promise.succeed(anyResult)
-//            return promise.futureResult
-//        }.flatMapError { error in
-//            promise.fail(error)
-//            return promise.futureResult
-//        }
     }
 }
