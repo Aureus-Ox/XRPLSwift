@@ -390,7 +390,8 @@ public actor Connection: Sendable, WebsocketResponding {
         guard self.shouldBeConnected, let ws = self.ws else {
             throw NotConnectedError("Not Connected")
         }
-        let (_, message, responsePromise) = try! self.requestManager.createRequest(
+
+        let (_, message, responsePromise) = try self.requestManager.createRequest(
             request: request,
             timeout: timeout ?? self.config.timeout ?? 10
         )
