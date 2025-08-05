@@ -440,6 +440,7 @@ public class Wallet {
                 return innerMemo
             } as AnyObject
         }
+        
         if txCopy["TransactionType"] as! String == "NFTokenMint" && txCopy["URI"] != nil {
             if !isHex(str: txCopy["URI"] as! String) {
                 throw ValidationError("URI must be a hex value")
