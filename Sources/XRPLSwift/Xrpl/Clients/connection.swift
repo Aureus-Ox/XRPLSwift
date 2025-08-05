@@ -329,7 +329,6 @@ public actor Connection: Sendable, WebsocketResponding {
     public func disconnect() async -> EventLoopFuture<Any?> {
         let promise = connEventGroup.next().makePromise(of: Any?.self)
         self.clearHeartbeatInterval()
-        await self.connectionManager.rejectAllAwaiting(error: ConnectionError("Disconnection requested"))
 
         if self.reconnectTimeoutID != nil {
             self.reconnectTimeoutID?.invalidate()
@@ -357,6 +356,7 @@ public actor Connection: Sendable, WebsocketResponding {
             _ = try? await self.ws?.close(code: .normalClosure)
         }
 
+        await self.connectionManager.rejectAllAwaiting(error: ConnectionError("Disconnection requested"))
         return promise.futureResult
     }
 
