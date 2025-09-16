@@ -246,7 +246,7 @@ func submitRequest(
      
      if (lastLedger < latestLedger) {
          throw XrplError(
-            "The latest ledger sequence \(latestLedger) is greater than the transaction's LastLedgerSequence (\(lastLedger)). Preliminary result: \(submissionResult)",
+            "The latest ledger sequence \(latestLedger) is greater than the transaction's LastLedgerSequence (\(lastLedger)). Preliminary result: \(submissionResult)"
          )
      }
      
@@ -266,7 +266,7 @@ func submitRequest(
             client: client,
             txHash: txHash,
             lastLedger: lastLedger,
-            submissionResult: submissionResult,
+            submissionResult: submissionResult
          )
      } else if let response = txResponse as? ErrorResponse {
          if response.error.contains("txnNotFound") {
@@ -274,7 +274,7 @@ func submitRequest(
                 client: client,
                 txHash: txHash,
                 lastLedger: lastLedger,
-                submissionResult: submissionResult,
+                submissionResult: submissionResult
              )
          }
          
