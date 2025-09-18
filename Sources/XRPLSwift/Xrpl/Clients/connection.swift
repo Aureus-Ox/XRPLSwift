@@ -302,7 +302,7 @@ public actor Connection: Sendable, WebsocketResponding {
                     throw ConnectionError("Connect: created null websocket")
                 }
 
-                self.retryConnectionBackoff.reset()
+                await self.retryConnectionBackoff.reset()
                 await self.startHeartbeatInterval()
                 await self.connectionManager.resolveAllAwaiting()
 
@@ -313,6 +313,13 @@ public actor Connection: Sendable, WebsocketResponding {
         //        this.ws.on('error', (error) => this.onConnectionFailed(error))
         //        this.ws.on('error', () => clearTimeout(connectionTimeoutID))
 
+        connectionLoopFuture.whenFailure { error in
+            NSLog("connection failed: \(error)")
+        }
+        
+//        connectionLoopFuture.whenSuccess {
+//            
+//        }
         try await connectionLoopFuture.get()
         return await self.connectionManager.awaitConnection()
     }
