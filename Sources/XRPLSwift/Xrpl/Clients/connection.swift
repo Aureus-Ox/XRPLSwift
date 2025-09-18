@@ -317,9 +317,9 @@ public actor Connection: Sendable, WebsocketResponding {
             NSLog("connection failed: \(error)")
         }
         
-//        connectionLoopFuture.whenSuccess {
-//            
-//        }
+        connectionLoopFuture.whenSuccess {
+            NSLog("connection success xrpl")
+        }
         try await connectionLoopFuture.get()
         return await self.connectionManager.awaitConnection()
     }
