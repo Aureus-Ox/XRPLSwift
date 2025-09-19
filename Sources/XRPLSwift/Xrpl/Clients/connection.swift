@@ -315,11 +315,15 @@ public actor Connection: Sendable, WebsocketResponding {
 
         connectionLoopFuture.whenFailure { error in
             NSLog("connection failed: \(error)")
+            Task {
+                await self.connectionManager.rejectAllAwaiting(error: error)
+            }
         }
         
         connectionLoopFuture.whenSuccess {
-            NSLog("connection success xrpl")
+            NSLog("xrpl connection success")
         }
+
         try await connectionLoopFuture.get()
         return await self.connectionManager.awaitConnection()
     }
