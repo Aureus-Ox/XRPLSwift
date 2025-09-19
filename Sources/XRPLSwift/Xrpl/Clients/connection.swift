@@ -521,11 +521,13 @@ public actor Connection: Sendable, WebsocketResponding {
         })
 
         // Handle a closed connection: reconnect if it was unexpected
-        _ = self.ws?.onClose.map { _ in
+        _ = self.ws?.onClose.map { error in
             
             // TODO: - THIS REASON AND CODE ARENT SET FROM ANYWHERE. FIGURE OUT WHAT TO DO HERE
             var reason: String = "none"
             var code: Int = 0
+            
+            NSLog("XRPL ON CLOSE \(error)")
             
             Task { [weak self] in
                 guard let self else { return }
