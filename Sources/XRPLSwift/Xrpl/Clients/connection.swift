@@ -531,6 +531,8 @@ public actor Connection: Sendable, WebsocketResponding {
             
             Task { [weak self] in
                 guard let self else { return }
+                
+                NSLog("XRPL WEBSOCKET CLOSE CODE \(await self.ws?.closeCode)")
 
                 if await socketIsOpen() {
                     NSLog("UNMPLEMENTED")
