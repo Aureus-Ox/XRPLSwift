@@ -542,8 +542,10 @@ public actor Connection: Sendable, WebsocketResponding {
                 try? await requestManager.rejectAll(error: DisconnectedError("websocket was closed, \(reason)"))
 
                 await self.setWebSocket(ws: nil)
+                await self.connectionManager.resolveAllAwaiting()
 
                 logger.warning("Websocket disconnected with code \(String(describing: code)): \(reason)")
+                
 
                 /*
                  * If this wasn"t a manual disconnect, then lets reconnect ASAP.
@@ -578,6 +580,7 @@ public actor Connection: Sendable, WebsocketResponding {
          */
         self.reconnectTimeoutID = Timer.scheduledTimer(withTimeInterval: TimeInterval(retryTimeout), repeats: false) { _ in
             Task {
+                NSLog("XRPL RECONNECT")
                 try await self.reconnect()
             }
         }
