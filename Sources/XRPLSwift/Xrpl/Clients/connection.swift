@@ -322,6 +322,9 @@ public actor Connection: Sendable, WebsocketResponding {
         
         connectionLoopFuture.whenSuccess {
             NSLog("xrpl connection success")
+            Task {
+                await self.connectionManager.resolveAllAwaiting()
+            }
         }
 
         try await connectionLoopFuture.get()
