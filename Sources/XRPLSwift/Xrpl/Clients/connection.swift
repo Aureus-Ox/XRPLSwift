@@ -38,7 +38,7 @@ class ConsoleLog {
 
 private let connEventGroup = MultiThreadedEventLoopGroup(numberOfThreads: 4)
 
-private let SECONDS_PER_MINUTE: Int = 60 // swiftlint:disable:this identifier_name
+private let SECONDS_PER_MINUTE: Double = 60 // swiftlint:disable:this identifier_name
 private let TIMEOUT: Int = 20
 private let CONNECTION_TIMEOUT: Int = 5 // swiftlint:disable:this identifier_name
 
@@ -195,7 +195,7 @@ public actor Connection: Sendable, WebsocketResponding {
     private var reconnectTimeoutID: Timer?
     private var heartbeatIntervalID: Timer?
     private let retryConnectionBackoff = ExponentialBackoff(
-        opts: ExponentialBackoffOptions(min: 100, max: SECONDS_PER_MINUTE * 1000)
+        opts: ExponentialBackoffOptions(min: 0.1, max: SECONDS_PER_MINUTE)
     )
 
     let config: ConnectionOptions
@@ -573,7 +573,7 @@ public actor Connection: Sendable, WebsocketResponding {
      Error if the websocket initialized is somehow null.
      */
     private func intentionalDisconnect() {
-        let retryTimeout: Int = self.retryConnectionBackoff.duration()
+        let retryTimeout = self.retryConnectionBackoff.duration()
         //            self.trace("reconnect", "Retrying connection in \(retryTimeout)ms.")
         //            self.emit("reconnecting", self.retryConnectionBackoff.attempts)
         logger.log("reconnecting: \(String(describing: self.retryConnectionBackoff.attempts)))")
@@ -581,7 +581,7 @@ public actor Connection: Sendable, WebsocketResponding {
          * Start the reconnect timeout, but set it to `this.reconnectTimeoutID`
          * so that we can cancel one in-progress on disconnect.
          */
-        self.reconnectTimeoutID = Timer.scheduledTimer(withTimeInterval: TimeInterval(retryTimeout), repeats: false) { _ in
+        self.reconnectTimeoutID = Timer.scheduledTimer(withTimeInterval: retryTimeout, repeats: false) { _ in
             Task {
                 NSLog("XRPL RECONNECT")
                 try await self.reconnect()
