@@ -27,6 +27,8 @@ func getXrpBalance(
 ) async -> String {
     let xrpRequest = AccountInfoRequest(account: address, ledgerHash: ledgerHash, ledgerIndex: ledgerIndex)
     let response = try? await client.request(xrpRequest).get() as? BaseResponse<AccountInfoResponse>
+    // Waiting for buffer to clear
+    try? await Task.sleep(for: .milliseconds(70))
     guard let response = response else {
         return "0"
     }
