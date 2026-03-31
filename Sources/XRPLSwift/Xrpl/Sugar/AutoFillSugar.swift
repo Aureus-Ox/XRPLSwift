@@ -62,6 +62,48 @@ public class AutoFillSugar {
         return promise.futureResult
     }
 
+    /**
+     Autofills fields in a transaction. This will set `Sequence`, `Fee`,
+     `lastLedgerSequence` according to the current state of the server this Client
+     is connected to. It also converts all X-Addresses to classic addresses and
+     flags interfaces into numbers.
+     - parameters:
+        - client: A client.
+        - transaction: A {@link Transaction} in JSON format
+        - signersCount: The expected number of signers for this transaction. Only used for multisigned transactions.
+     - returns
+     The autofilled transaction.
+     */
+    public func autofill<T: BaseTransaction>(
+        _ client: XrplClient,
+        _ transaction: T,
+        _ signersCount: Int?
+    ) async throws -> EventLoopFuture<T> {
+        var tx = try transaction.toJson()
+
+        try setValidAddresses(&tx)
+
+        try setTransactionFlagsToNumber(tx: &tx)
+
+        var promises: [Void] = []
+        if tx["Sequence"] == nil {
+            await promises.append(self.setNextValidSequenceNumber(client, &tx))
+        }
+        if tx["Fee"] == nil {
+            await promises.append(try self.calculateFeePerTransactionType(client, &tx, signersCount))
+        }
+        if tx["LastLedgerSequence"] == nil {
+            await promises.append(try self.setLatestValidatedLedgerSequence(client, &tx))
+        }
+        if tx["TransactionType"] as! String == "AccountDelete" {
+            await promises.append(try self.checkAccountDeleteBlockers(client, &tx))
+        }
+        let promise = autofillEventGroup.next().makePromise(of: T.self)
+        _ = promises.compactMap({ $0 })
+        promise.succeed(try T(json: tx))
+        return promise.futureResult
+    }
+
     func setValidAddresses(_ tx: inout [String: AnyObject]) throws {
         try validateAccountAddress(&tx, "Account", "SourceTag")
         // eslint-disable-next-line @typescript-eslint/dot-notation -- Destination can exist on Transaction

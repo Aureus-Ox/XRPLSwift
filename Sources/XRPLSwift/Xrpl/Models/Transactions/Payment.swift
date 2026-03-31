@@ -71,8 +71,10 @@ public class Payment: BaseTransaction, XrplTransaction {
      <http://xrpl.local/payment.html#types-of-payments>`_.
      Payments are also the only way to `create accounts
      <http://xrpl.local/payment.html#creating-accounts>`_.
+     
+     Amount is an Alias to DeliverMax in V2.
+     We can just change the key for encoding and decoding here
      */
-
     public var amount: Amount
     /*
      The amount of currency to deliver. If the Partial Payment flag is set,
@@ -123,6 +125,7 @@ public class Payment: BaseTransaction, XrplTransaction {
 
     enum CodingKeys: String, CodingKey {
         case amount = "Amount"
+        case deliverMax = "DeliverMax"
         case destination = "Destination"
         case destinationTag = "DestinationTag"
         case invoiceId = "InvoiceID"
@@ -138,7 +141,8 @@ public class Payment: BaseTransaction, XrplTransaction {
         invoiceId: String? = nil,
         paths: [Path]? = nil,
         sendMax: Amount? = nil,
-        deliverMin: Amount? = nil
+        deliverMin: Amount? = nil,
+        memos: [MemoWrapper]? = nil
     ) {
         self.amount = amount
         self.destination = destination
@@ -147,10 +151,10 @@ public class Payment: BaseTransaction, XrplTransaction {
         self.paths = paths
         self.sendMax = sendMax
         self.deliverMin = deliverMin
-        super.init(account: "", transactionType: "Payment")
+        super.init(account: "", transactionType: "Payment", memos: memos)
     }
 
-    override public init(json: [String: AnyObject]) throws {
+    public required init(json: [String: AnyObject]) throws {
         let decoder = JSONDecoder()
         let data: Data = try JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
         let decoded = try decoder.decode(Payment.self, from: data)
@@ -166,7 +170,11 @@ public class Payment: BaseTransaction, XrplTransaction {
 
     public required init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
-        amount = try values.decode(Amount.self, forKey: .amount)
+        if let deliverMax = try? values.decode(Amount.self, forKey: .deliverMax) {
+            amount = deliverMax
+        } else {
+            amount = try values.decode(Amount.self, forKey: .amount)
+        }
         destination = try values.decode(String.self, forKey: .destination)
         destinationTag = try values.decodeIfPresent(Int.self, forKey: .destinationTag)
         invoiceId = try values.decodeIfPresent(String.self, forKey: .invoiceId)
@@ -179,7 +187,7 @@ public class Payment: BaseTransaction, XrplTransaction {
     override public func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try super.encode(to: encoder)
-        try values.encode(amount, forKey: .amount)
+        try values.encode(amount, forKey: .deliverMax)
         try values.encode(destination, forKey: .destination)
         if let destinationTag = destinationTag { try values.encode(destinationTag, forKey: .destinationTag) }
         if let invoiceId = invoiceId { try values.encode(invoiceId, forKey: .invoiceId) }

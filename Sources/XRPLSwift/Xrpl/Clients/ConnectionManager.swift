@@ -29,11 +29,11 @@ public class ConnectionManager {
     /**
      * Resolves all awaiting connections.
      */
-    public func resolveAllAwaiting() {
+    public func resolveAllAwaiting() async {
         _ = self.promisesAwaitingConnection.map { resolve in
             resolve.succeed("")
         }
-        self.promisesAwaitingConnection = []
+        self.promisesAwaitingConnection.removeAll()
     }
 
     /**
@@ -41,11 +41,19 @@ public class ConnectionManager {
      *
      * @param error - Error to throw in the rejection.
      */
-    public func rejectAllAwaiting(error: Error) {
+    public func rejectAllAwaiting(error: Error) async {
         _ = self.promisesAwaitingConnection.map { resolve in
             resolve.fail(error)
         }
-        self.promisesAwaitingConnection = []
+        self.promisesAwaitingConnection.removeAll()
+    }
+    
+    /**
+     * Check for awaiting connection
+     *
+     */
+    public func hasAwaitingConnection() -> Bool {
+        return self.promisesAwaitingConnection.count > 0
     }
 
     /**
@@ -54,7 +62,13 @@ public class ConnectionManager {
      * @returns A promise for resolving the connection.
      */
     public func awaitConnection() async -> EventLoopFuture<Any> {
-        let promise = eventGroup.next().makePromise(of: Any.self)
+        let eventLoop = eventGroup.next()
+        let promise = eventLoop.makePromise(of: Any.self)
+    
+        eventLoop.scheduleTask(in: .seconds(2)) {
+            promise.fail(TimeoutError("Connection timeout", nil))
+        }
+
         self.promisesAwaitingConnection.append(promise)
         return promise.futureResult
     }

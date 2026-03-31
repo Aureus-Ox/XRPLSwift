@@ -11,7 +11,8 @@ import Foundation
 import NIO
 
 /// Approximate time for a ledger to close, in milliseconds
-let LEDGER_CLOSE_TIME = 4000 // swiftlint:disable:this identifier_name
+let LEDGER_CLOSE_TIME_MILLI: UInt32 = 3000 // swiftlint:disable:this identifier_name
+let LEDGER_CLOSE_TIME: UInt32 = 4 // swiftlint:disable:this identifier_name
 
 public enum SubmitTransaction: Codable {
     case tx(Transaction)
@@ -89,6 +90,31 @@ func submit(
     return try await submitRequest(client, signedTx, failHard)
 }
 
+/**
+ Submits a signed/unsigned transaction.
+ Steps performed on a transaction:
+     1. Autofill.
+     2. Sign & Encode.
+     3. Submit.
+ - parameters:
+    - client: A Client.
+    - transaction: A transaction to autofill, sign & encode, and submit.
+    - autofill: If true, autofill a transaction.
+    - failHard: If true, and the transaction fails locally, do not retry or relay the transaction to other servers.
+    - wallet: A wallet to sign a transaction. It must be provided when submitting an unsigned transaction.
+ - returns:
+ A promise that contains SubmitResponse.
+ - throws:
+ RippledError if submit request fails.
+ */
+func submit(
+    _ client: XrplClient,
+    _ transaction: BaseTransaction,
+    _ failHard: Bool? = false
+) async throws -> EventLoopFuture<Any> {
+    return try await submitRequest(client, transaction, failHard)
+}
+
 func submit(
     _ client: XrplClient,
     _ transaction: String,
@@ -115,38 +141,57 @@ func submit(
  */
 func submitAndWait(
     _ client: XrplClient,
-    //  transaction: Transaction | string,
-    _ transaction: Transaction,
-    _ opts: SubmitOptions? = nil
-    // ) async throws -> EventLoopFuture<TxResponse> {
-) async throws -> String {
-    let signedTx = try await getSignedTx(
-        client,
-        transaction,
-        opts?.autofill ?? false,
-        opts?.wallet
-    )
-
-    let lastLedger: Int? = getLastLedgerSequence(signedTx)
-    if lastLedger == nil {
+    _ transaction: BaseTransaction,
+    _ failHard: Bool? = false
+) async throws -> BaseResponse<SubmitResponse> {
+    guard let lastLedger = getLastLedgerSequence(transaction) else {
         throw ValidationError("Transaction must contain a LastLedgerSequence value for reliable submission.")
     }
 
-    let response = try await submitRequest(client, signedTx, opts?.failHard)
-    //    let txHash = opts?.hashes.hashSignedTx(signedTx)
-    //    return waitForFinalTransactionOutcome(
-    //        this,Int
-    //        txHash,
-    //        lastLedger,
-    //        response.result.engine_result,
-    //    )
-    return ""
+    let response = try await submitRequest(client, transaction, failHard).get()
+    
+    guard let result = response as? BaseResponse<SubmitResponse>,
+          let transactionJson = try? result.result?.txJson.toJson(),
+          let engineResult = result.result?.engineResult,
+          transactionJson.contains(where: { $0.key == "hash" }),
+          let txHash = transactionJson["hash"] as? String
+    else {
+        throw ValidationError("Transaction must contain a hash value for reliable submission.")
+    }
+
+    _ = try await waitForFinalTransactionOutcome(
+        client: client,
+        txHash: txHash,
+        lastLedger: lastLedger,
+        submissionResult: engineResult
+    )
+
+    return result
 }
 
 // Encodes and submits a signed transaction.
 func submitRequest(
     _ client: XrplClient,
     _ signedTransaction: Transaction,
+    _ failHard: Bool? = false
+    // ) async throws -> EventLoopFuture<SubmitResponse> {
+) async throws -> EventLoopFuture<Any> {
+    if !isSigned(try signedTransaction.toJson()) {
+        throw ValidationError("Transaction must be signed")
+    }
+    let signedTxEncoded: String = try BinaryCodec.encode(signedTransaction.toJson())
+    let request = SubmitRequest(
+        txBlob: signedTxEncoded,
+        //        failHard: isAccountDelete(transaction: signedTransaction) || failHard!
+        failHard: failHard!
+    )
+    return try await client.request(req: request)!
+}
+
+// Encodes and submits a signed transaction.
+func submitRequest(
+    _ client: XrplClient,
+    _ signedTransaction: BaseTransaction,
     _ failHard: Bool? = false
     // ) async throws -> EventLoopFuture<SubmitResponse> {
 ) async throws -> EventLoopFuture<Any> {
@@ -188,58 +233,56 @@ func submitRequest(
 // * latest ledger sequence (meaning it will never be included in a validated ledger).
 // */
 //// eslint-disable-next-line max-params, max-lines-per-function -- this function needs to display and do with more information.
-// func waitForFinalTransactionOutcome(
-//  client: Client,
-//  txHash: string,
-//  lastLedger: number,
-//  submissionResult: string,
-// ) -> async EventLoopFuture<TxResponse> {
-//  await sleep(LEDGER_CLOSE_TIME)
-//
-//  const latestLedger = await client.getLedgerIndex()
-//
-//  if (lastLedger < latestLedger) {
-//    throw new XrplError(
-//      `The latest ledger sequence ${latestLedger} is greater than the transaction"s LastLedgerSequence (${lastLedger}).\n` +
-//        `Preliminary result: ${submissionResult}`,
-//    )
-//  }
-//
-//  const txResponse = await client
-//    .request({
-//      command: "tx",
-//      transaction: txHash,
-//    })
-//    .catch(async (error) => {
-//      // error is of an unknown type and hence we assert type to extract the value we need.
-//      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions,@typescript-eslint/no-unsafe-member-access -- ^
-//      const message = error?.data?.error as string
-//      if (message === "txnNotFound") {
-//        return waitForFinalTransactionOutcome(
-//          client,
-//          txHash,
-//          lastLedger,
-//          submissionResult,
-//        )
-//      }
-//      throw new Error(
-//        `${message} \n Preliminary result: ${submissionResult}.\nFull error details: ${String(
-//          error,
-//        )}`,
-//      )
-//    })
-//
-//  if (txResponse.result.validated) {
-//    return txResponse
-//  }
-//
-//  return waitForFinalTransactionOutcome(
-//    client,
-//    txHash,
-//    lastLedger,
-//    submissionResult,
-//  )
-// }
+ func waitForFinalTransactionOutcome(
+  client: XrplClient,
+  txHash: String,
+  lastLedger: Int,
+  submissionResult: String
+ ) async throws -> TxResponse {
+     // Approximated ledger close time
+     sleep(LEDGER_CLOSE_TIME)
+     
+     let latestLedger = try await client.getLedgerIndex()
+     
+     if (lastLedger < latestLedger) {
+         throw XrplError(
+            "The latest ledger sequence \(latestLedger) is greater than the transaction's LastLedgerSequence (\(lastLedger)). Preliminary result: \(submissionResult)"
+         )
+     }
+     
+     let txRequest = TxRequest(transaction: txHash)
+     let txResponse = try await client.request(txRequest).get()
+
+     if let response = txResponse as? BaseResponse<TxResponse> {
+         guard let result = response.result, let validated = result.validated else {
+             throw XrplError("Unexpected Tx Result")
+         }
+    
+         if validated {
+             return result
+         }
+         
+         return try await waitForFinalTransactionOutcome(
+            client: client,
+            txHash: txHash,
+            lastLedger: lastLedger,
+            submissionResult: submissionResult
+         )
+     } else if let response = txResponse as? ErrorResponse {
+         if response.error.contains("txnNotFound") {
+             return try await waitForFinalTransactionOutcome(
+                client: client,
+                txHash: txHash,
+                lastLedger: lastLedger,
+                submissionResult: submissionResult
+             )
+         }
+         
+         throw XrplError("Unexpected Error: \(response.error)")
+     } else {
+         throw XrplError("Invalid Tx Response")
+     }
+ }
 
 // checks if the transaction has been signed
 func isSigned(_ transaction: String) -> Bool {
@@ -278,6 +321,7 @@ func getSignedTx(
     }
     return try wallet.sign(tx, false).txBlob
 }
+
 func getSignedTx(
     _ client: XrplClient,
     _ transaction: Transaction,
@@ -293,7 +337,7 @@ func getSignedTx(
         throw ValidationError("Wallet must be provided when submitting an unsigned transaction")
     }
     //    var tx = try transaction.toAny() as! BaseTransaction
-    var tx = try transaction.toJson() as! [String: AnyObject]
+    var tx = try transaction.toJson()
     if autofill {
         tx = try await AutoFillSugar().autofill(client, tx, 0).get()
     }
@@ -308,8 +352,13 @@ func getLastLedgerSequence(_ transaction: String) -> Int? {
 
 // checks if there is a LastLedgerSequence as a part of the transaction
 func getLastLedgerSequence(_ transaction: Transaction) -> Int? {
-    let tx = try! transaction.toJson() as! [String: AnyObject]
-    return tx["LastLedgerSequence"] as? Int
+    let tx = try? transaction.toJson()
+    return tx?["LastLedgerSequence"] as? Int
+}
+
+// checks if there is a LastLedgerSequence as a part of the transaction
+func getLastLedgerSequence(_ transaction: BaseTransaction) -> Int? {
+    return transaction.lastLedgerSequence
 }
 
 // checks if the transaction is an AccountDelete transaction

@@ -204,72 +204,72 @@ public class XrplClient: ConnectionDelegate {
      * @category Network
      */
     // swiftlint:disable:next identifier_name
-    func request(_ r: AccountChannelsRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: AccountChannelsRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: AccountCurrenciesRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: AccountCurrenciesRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: AccountInfoRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: AccountInfoRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: AccountLinesRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: AccountLinesRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: AccountNFTsRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: AccountNFTsRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: AccountObjectsRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: AccountObjectsRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: AccountOffersRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: AccountOffersRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: AccountTxRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: AccountTxRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: BookOffersRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: BookOffersRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: ChannelVerifyRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: ChannelVerifyRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: DepositAuthorizedRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: DepositAuthorizedRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: FeeRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: FeeRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: GatewayBalancesRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: GatewayBalancesRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: LedgerRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: LedgerRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: LedgerClosedRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: LedgerClosedRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: LedgerCurrentRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: LedgerCurrentRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: LedgerDataRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: LedgerDataRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     //    // swiftlint:disable:next identifier_name
     //    func request(_ r: LedgerEntryRequest) async -> EventLoopFuture<Any> {
@@ -280,12 +280,12 @@ public class XrplClient: ConnectionDelegate {
     //        return await request(r: r)
     //    }
     //    // swiftlint:disable:next identifier_name
-    func request(_ r: NFTBuyOffersRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: NFTBuyOffersRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: NFTSellOffersRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: NFTSellOffersRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     //    // swiftlint:disable:next identifier_name
     //    func request(_ r: NoRippleCheckRequest) async -> EventLoopFuture<Any> {
@@ -296,32 +296,32 @@ public class XrplClient: ConnectionDelegate {
     //        return await request(r: r)
     //    }
     // swiftlint:disable:next identifier_name
-    func request(_ r: PingRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: PingRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: RandomRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: RandomRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: RipplePathFindRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: RipplePathFindRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: ServerInfoRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: ServerInfoRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     //    // swiftlint:disable:next identifier_name
-    func request(_ r: ServerStateRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: ServerStateRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: SubmitRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: SubmitRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: SubmitMultisignedRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: SubmitMultisignedRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     //    // swiftlint:disable:next identifier_name
     //    func request(_ r: SubscribeRequest) async -> EventLoopFuture<Any> {
@@ -332,21 +332,21 @@ public class XrplClient: ConnectionDelegate {
     //        return await request(r: r)
     //    }
     // swiftlint:disable:next identifier_name
-    func request(_ r: TransactionEntryRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: TransactionEntryRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    func request(_ r: TxRequest) async -> EventLoopFuture<Any> {
-        return await request(r: r)
+    func request(_ r: TxRequest) async throws -> EventLoopFuture<Any> {
+        return try await request(r: r)
     }
     // swiftlint:disable:next identifier_name
-    public func request<R: BaseRequest>(r: R) async -> EventLoopFuture<Any> {
+    public func request<R: BaseRequest>(r: R) async throws -> EventLoopFuture<Any> {
         //        if let account: String = requestDict["account"] as? String {
         //            requestDict["account"] = ensureClassicAddress(account) as AnyObject
         //        } else {
         //            requestDict["account"] = nil
         //        }
-        let response = try! await self.connection.request(request: r, timeout: 3)
+        let response = try await self.connection.request(request: r, timeout: 3)
 
         // mutates `response` to add warnings
         //        handlePartialPayment(req.command, response)
@@ -621,6 +621,12 @@ public class XrplClient: ConnectionDelegate {
     public func autofill(transaction: Transaction, signersCount: Int? = 0) async throws -> EventLoopFuture<[String: AnyObject]> {
         return try await AutoFillSugar().autofill(self, try transaction.toJson(), signersCount)
     }
+    
+    // We should phase out `Transaction` in liu of BaseTransaction. No need to wrap in an enum,
+    // makes for bad abstraction.
+    public func autofill<T: BaseTransaction>(transaction: T, signersCount: Int? = 0) async throws -> EventLoopFuture<T> {
+        return try await AutoFillSugar().autofill<T>(self, transaction, signersCount)
+    }
 
     public func submit(transaction: Transaction, opts: SubmitOptions?) async throws -> EventLoopFuture<Any> {
         return try await XRPLSwift.submit(
@@ -629,6 +635,15 @@ public class XrplClient: ConnectionDelegate {
             opts?.autofill,
             opts?.failHard,
             opts?.wallet
+        )
+    }
+
+    // We should phase out `Transaction` in liu of BaseTransaction. No need to wrap in an enum,
+    // makes for bad abstraction.
+    public func submit(transaction: BaseTransaction, opts: SubmitOptions?) async throws -> EventLoopFuture<Any> {
+        return try await XRPLSwift.submit(
+            self,
+            transaction
         )
     }
 
@@ -641,13 +656,21 @@ public class XrplClient: ConnectionDelegate {
             opts?.wallet
         )
     }
+    
+    public func submitAndWait(transaction: BaseTransaction, opts: SubmitOptions?) async throws -> BaseResponse<SubmitResponse> {
+        return try await XRPLSwift.submitAndWait(
+            self,
+            transaction
+        )
+    }
+    
     //    /**
     //     * @category Core
     //     */
     //    public submitAndWait = submitAndWait
     //
     public func getXrpBalance(address: String) async throws -> String {
-        return try await XRPLSwift.getXrpBalance(self, address)
+        return await XRPLSwift.getXrpBalance(self, address)
     }
     //    /**
     //     * @category Abstraction
