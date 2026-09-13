@@ -10,6 +10,22 @@
 
 A pure Swift implementation for interacting with the XRP Ledger, the `XRPLSwift` library simplifies the hardest parts of XRP Ledger interaction, like serialization and transaction signing, by providing native Swift methods and models for [XRP Ledger transactions](https://xrpl.org/transaction-formats.html) and core server [API](https://xrpl.org/api-conventions.html) ([`rippled`](https://github.com/ripple/rippled)) objects.
 
+## Websocket connection
+
+`XrplClient` takes a `ws://` or `wss://` rippled/clio URL (JSON-RPC HTTP URLs are not valid). `connect()` waits until the socket is actually open. After the first `connect()`, unexpected drops are retried with exponential backoff, a 20s WebSocket ping, and a JSON-RPC `ping` heartbeat. Call `disconnect()` to stop retries.
+
+Apps should not poll `isConnected()`. Use `waitUntilConnected()` before RPC, or observe `XRPLConnectionDelegate`:
+
+```swift
+let client = try XrplClient(server: "wss://xrpl.oxenflow.io")
+client.connectionDelegate = self // xrplConnection(didChangeState:)
+try await client.connect()
+try await client.waitUntilConnected()
+let balance = try await client.getXrpBalance(address: rAddress)
+```
+
+`request(...)` also waits for an in-flight reconnect when the client already called `connect()`.
+
 
 
 ```swift

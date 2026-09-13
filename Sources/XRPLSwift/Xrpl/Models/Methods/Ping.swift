@@ -50,8 +50,8 @@ public class PingResponse: Codable {
 
     public required init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
-        role = try values.decode(String.self, forKey: .role)
-        unlimited = try values.decode(Bool.self, forKey: .unlimited)
+        role = try values.decodeIfPresent(String.self, forKey: .role)
+        unlimited = try values.decodeIfPresent(Bool.self, forKey: .unlimited)
         //        try super.init(from: decoder)
     }
 
