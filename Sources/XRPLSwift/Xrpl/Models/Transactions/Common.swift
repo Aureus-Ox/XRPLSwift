@@ -177,6 +177,10 @@ public class BaseTransaction: Codable {
      */
     public var ticketSequence: Int?
     /**
+     The hash that correseponds to the submission
+     */
+    public var hash: String?
+    /**
      The signature that verifies this transaction as originating from the
      account it says it is from.
      */
@@ -195,6 +199,7 @@ public class BaseTransaction: Codable {
         case sourceTag = "SourceTag"
         case signingPubKey = "SigningPubKey"
         case ticketSequence = "TicketSequence"
+        case hash
         case txnSignature = "TxnSignature"
     }
 
@@ -213,6 +218,7 @@ public class BaseTransaction: Codable {
         sourceTag: Int? = nil,
         signingPubKey: String? = nil,
         ticketSequence: Int? = nil,
+        hash: String? = nil,
         txnSignature: String? = nil
     ) {
         // Required
@@ -229,10 +235,11 @@ public class BaseTransaction: Codable {
         self.sourceTag = sourceTag
         self.signingPubKey = signingPubKey
         self.ticketSequence = ticketSequence
+        self.hash = hash
         self.txnSignature = txnSignature
     }
 
-    public init(json: [String: AnyObject]) throws {
+    public required init(json: [String: AnyObject]) throws {
         let decoder = JSONDecoder()
         let data: Data = try! JSONSerialization.data(withJSONObject: json, options: .prettyPrinted)
         let decoded = try decoder.decode(BaseTransaction.self, from: data)
@@ -250,6 +257,7 @@ public class BaseTransaction: Codable {
         self.sourceTag = decoded.sourceTag
         self.signingPubKey = decoded.signingPubKey
         self.ticketSequence = decoded.ticketSequence
+        self.hash = decoded.hash
         self.txnSignature = decoded.txnSignature
     }
 
@@ -267,6 +275,7 @@ public class BaseTransaction: Codable {
         sourceTag = try? values.decodeIfPresent(Int.self, forKey: .sourceTag)
         signingPubKey = try? values.decodeIfPresent(String.self, forKey: .signingPubKey)
         ticketSequence = try? values.decodeIfPresent(Int.self, forKey: .ticketSequence)
+        hash = try? values.decodeIfPresent(String.self, forKey: .hash)
         txnSignature = try? values.decodeIfPresent(String.self, forKey: .txnSignature)
     }
 
@@ -284,6 +293,7 @@ public class BaseTransaction: Codable {
         if let sourceTag = sourceTag { try values.encode(sourceTag, forKey: .sourceTag) }
         if let signingPubKey = signingPubKey { try values.encode(signingPubKey, forKey: .signingPubKey) }
         if let ticketSequence = ticketSequence { try values.encode(ticketSequence, forKey: .ticketSequence) }
+        if let hash = hash { try values.encode(hash, forKey: .hash) }
         if let txnSignature = txnSignature { try values.encode(txnSignature, forKey: .txnSignature) }
     }
 }

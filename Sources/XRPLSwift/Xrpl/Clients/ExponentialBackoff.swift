@@ -18,23 +18,23 @@ import Foundation
 
 struct ExponentialBackoffOptions {
     // The min backoff duration.
-    var min: Int?
+    var min: Double?
     // The max backoff duration.
-    var max: Int?
+    var max: Double?
 }
 
 // swiftlint:disable:next identifier_name
-let DEFAULT_MIN = 100
+let DEFAULT_MIN: Double = 1
 // swiftlint:disable:next identifier_name
-let DEFAULT_MAX = 1000
+let DEFAULT_MAX: Double = 60
 
 /**
  * A Back off strategy that increases exponentially. Useful with repeated
  * setTimeout calls over a network (where the destination may be down).
  */
 class ExponentialBackoff {
-    private var ms: Int
-    private var max: Int
+    private var ms: Double
+    private var max: Double
     private var factor: Int = 2
     private var numAttempts: Int = 0
 
@@ -62,10 +62,10 @@ class ExponentialBackoff {
      *
      * @returns The backoff duration in milliseconds.
      */
-    public func duration() -> Int {
-        let ms = self.ms * BInt(self.factor) ** self.numAttempts
+    public func duration() -> Double {
+        let ms = self.ms * pow(Double(self.factor), Double(self.numAttempts))
         self.numAttempts += 1
-        return Int(round(Double(min(Int(ms), self.max))))
+        return round(min(ms, self.max))
     }
 
     /**

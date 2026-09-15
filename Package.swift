@@ -6,8 +6,8 @@ import PackageDescription
 let package = Package(
     name: "XRPLSwift",
     platforms: [
-        .macOS(.v10_15),
-        .iOS(.v14),
+        .macOS(.v13),
+        .iOS(.v16),
         .tvOS(.v13),
         .watchOS(.v5)
     ],

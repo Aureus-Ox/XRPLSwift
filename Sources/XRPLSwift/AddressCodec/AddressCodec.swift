@@ -75,13 +75,13 @@ public class AddressCodec {
         guard let data = Data(base58Decoding: xAddress) else {
             throw AddressCodecError.valueError
         }
-        let check = data.suffix(4).bytes
-        let concatenated = data.prefix(31).bytes
-        if check != [UInt8](Data(concatenated).sha256().sha256().prefix(through: 3)) {
+        let check = data.suffix(4)
+        let concatenated = data.prefix(31)
+        if check != concatenated.sha256().sha256().prefix(through: 3) {
             throw AddressCodecError.invalidAddress
         }
         let isTest: Bool = try self.isTestAddress([UInt8](concatenated[..<2]))
-        let tag: Int? = try self.tagFromBuffer(concatenated)
+        let tag: Int? = try self.tagFromBuffer([UInt8](concatenated))
         let classicAddressBytes: [UInt8] = [UInt8](concatenated[2..<22])
         let classicAddress = try XrplCodec.encodeClassicAddress(classicAddressBytes)
         return FullClassicAddress(classicAddress: classicAddress, tag: tag, isTest: isTest)

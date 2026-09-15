@@ -15,10 +15,12 @@
  The most recently validated ledger index.
  */
 public func getLedgerIndex(_ client: XrplClient) async throws -> Int {
-    let dict: [String: AnyObject] = [
-        "command": "ledger",
-        "ledger_index": "validated"
-    ] as [String: AnyObject]
-    let ledgerResponse = try await client.request(LedgerRequest(dict)).wait() as? BaseResponse<LedgerResponse>
-    return (ledgerResponse?.result!.ledgerIndex)!
+    let ledgerValidatedRequest = LedgerRequest(ledgerIndex: .string("validated"))
+    guard let ledgerResponse = try? await client.request(ledgerValidatedRequest).get() as? BaseResponse<LedgerResponse>,
+          let ledgerIndex = ledgerResponse.result?.ledgerIndex
+    else {
+        return 0
+    }
+
+    return ledgerIndex
 }

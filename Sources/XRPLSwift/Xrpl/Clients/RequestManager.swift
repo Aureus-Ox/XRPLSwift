@@ -112,9 +112,10 @@ public class RequestManager {
         request.id = newId
         let encoder = JSONEncoder()
         let newRequest = try! encoder.encode(request).to(type: String.self)
+        let requestId = newId
         let timer = Timer.scheduledTimer(withTimeInterval: Double(timeout), repeats: false) { _ in
             Task {
-                try! self.reject(id: self.nextId, error: TimeoutError("Timeout Error"))
+                try? self.reject(id: requestId, error: TimeoutError("Timeout Error"))
             }
         }
         //    /*
