@@ -133,13 +133,14 @@ public protocol ConnectionDelegate: AnyObject {
     func pathFind(path: Any)
 }
 
+@preconcurrency
 public protocol WebsocketResponding: AnyObject {
     func isConnected() async -> Bool
     func connect() async throws -> EventLoopFuture<Any>
     func disconnect() async -> EventLoopFuture<Any?>
     func reconnect() async throws
     func waitUntilConnected(timeoutSeconds: Double) async throws
-    func currentState() -> XRPLConnectionState
+    func currentState() async -> XRPLConnectionState
 
     func request<R: BaseRequest>(request: R, timeout: Int?) async throws -> EventLoopFuture<Any>
     func getUrl() async -> String
@@ -215,7 +216,7 @@ public actor Connection: Sendable, WebsocketResponding {
         delegateBox.delegate = delegate
     }
 
-    public func currentState() -> XRPLConnectionState {
+    public func currentState() async -> XRPLConnectionState {
         return connectionState
     }
 
@@ -224,7 +225,11 @@ public actor Connection: Sendable, WebsocketResponding {
      - returns:
      Whether the websocket connection is open.
      */
-    public func isConnected() -> Bool {
+    public func isConnected() async -> Bool {
+        return hasLiveSocket()
+    }
+
+    private func hasLiveSocket() -> Bool {
         return socketIsOpen() && connectionState == .connected
     }
 
@@ -237,7 +242,7 @@ public actor Connection: Sendable, WebsocketResponding {
     public func connect() async throws -> EventLoopFuture<Any> {
         wantsConnection = true
 
-        if isConnected() {
+        if hasLiveSocket() {
             return succeededFuture()
         }
 
@@ -317,12 +322,12 @@ public actor Connection: Sendable, WebsocketResponding {
     }
 
     public func waitUntilConnected(timeoutSeconds: Double = 30) async throws {
-        if isConnected() { return }
+        if hasLiveSocket() { return }
         if !wantsConnection {
             _ = try await connect()
             return
         }
-        if isConnected() { return }
+        if hasLiveSocket() { return }
 
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             let id = UUID()
@@ -374,7 +379,7 @@ public actor Connection: Sendable, WebsocketResponding {
      - returns:
      The Websocket connection URL.
      */
-    public func getUrl() -> String {
+    public func getUrl() async -> String {
         return self.url ?? ""
     }
 
@@ -492,7 +497,7 @@ public actor Connection: Sendable, WebsocketResponding {
 
     private func runScheduledReconnect() async {
         reconnectTask = nil
-        guard wantsConnection, !isConnected(), !Task.isCancelled else { return }
+        guard wantsConnection, !hasLiveSocket(), !Task.isCancelled else { return }
         do {
             _ = try await connect()
         } catch {
