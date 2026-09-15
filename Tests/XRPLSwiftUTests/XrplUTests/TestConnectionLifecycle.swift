@@ -74,6 +74,26 @@ final class TestConnectionLifecycle: XCTestCase {
         XCTAssertNoThrow(try XrplClient(server: "wss://xrpl.oxenflow.io"))
     }
 
+    func testUrlListStartsAtPrimary() async {
+        let connection = Connection(urls: [
+            "wss://xrpl.oxenflow.io",
+            "wss://xrplcluster.com"
+        ])
+        let url = await connection.getUrl()
+        XCTAssertEqual(url, "wss://xrpl.oxenflow.io")
+    }
+
+    func testClientAcceptsFallbackServers() {
+        XCTAssertNoThrow(try XrplClient(
+            server: "wss://xrpl.oxenflow.io",
+            fallbackServers: ["wss://xrplcluster.com", "wss://s2.ripple.com"]
+        ))
+        XCTAssertThrowsError(try XrplClient(
+            server: "wss://xrpl.oxenflow.io",
+            fallbackServers: ["https://s1.ripple.com"]
+        ))
+    }
+
     func testRequestWithoutConnectThrows() async {
         let connection = Connection(url: "wss://xrpl.oxenflow.io")
         do {

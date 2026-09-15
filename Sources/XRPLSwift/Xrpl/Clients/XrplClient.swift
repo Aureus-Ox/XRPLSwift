@@ -188,15 +188,24 @@ public class XrplClient: ConnectionDelegate {
      * @category Constructor
      */
     // eslint-disable-next-line max-lines-per-function -- okay because we have to set up all the connection handlers
-    public init(server: String, options: ClientOptions? = nil) throws {
+    public init(server: String, fallbackServers: [String] = [], options: ClientOptions? = nil) throws {
         if !isValidRippledWebsocketURL(server) {
             throw ValidationError("server URI must start with `wss://`, `ws://`, `wss+unix://`, or `ws+unix://`.")
+        }
+        var servers = [server]
+        for fallback in fallbackServers {
+            guard isValidRippledWebsocketURL(fallback) else {
+                throw ValidationError("fallback URI must start with `wss://`, `ws://`, `wss+unix://`, or `ws+unix://`.")
+            }
+            if fallback != server {
+                servers.append(fallback)
+            }
         }
         let delegateBox = XRPLConnectionDelegateBox()
         self.connectionDelegateBox = delegateBox
         self.feeCushion = options?.feeCushion ?? Double(DEFAULT_FEE_CUSHION)
         self.maxFeeXRP = options?.maxFeeXRP ?? DEFAULT_MAX_FEE_XRP
-        self.connection = Connection(url: server, options: options, delegateBox: delegateBox)
+        self.connection = Connection(urls: servers, options: options, delegateBox: delegateBox)
     }
 
     /**

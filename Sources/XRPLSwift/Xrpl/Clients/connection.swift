@@ -159,7 +159,12 @@ private struct ConnectionWaiter {
 public actor Connection: Sendable, WebsocketResponding {
     var trace: ConsoleLog?
 
-    let url: String?
+    let urls: [String]
+    private var urlIndex: Int = 0
+    var url: String? {
+        guard !urls.isEmpty else { return nil }
+        return urls[urlIndex]
+    }
     var ws: WebSocket?
     private let retryConnectionBackoff = ExponentialBackoff(
         opts: ExponentialBackoffOptions(min: 0.1, max: SECONDS_PER_MINUTE)
@@ -194,11 +199,19 @@ public actor Connection: Sendable, WebsocketResponding {
      - options: Options for the Connection object.
      */
     public init(url: String?, options: ConnectionUserOptions? = nil) {
-        self.init(url: url, options: options, delegateBox: XRPLConnectionDelegateBox())
+        self.init(urls: url.map { [$0] } ?? [], options: options, delegateBox: XRPLConnectionDelegateBox())
+    }
+
+    public init(urls: [String], options: ConnectionUserOptions? = nil) {
+        self.init(urls: urls, options: options, delegateBox: XRPLConnectionDelegateBox())
     }
 
     init(url: String?, options: ConnectionUserOptions? = nil, delegateBox: XRPLConnectionDelegateBox) {
-        self.url = url
+        self.init(urls: url.map { [$0] } ?? [], options: options, delegateBox: delegateBox)
+    }
+
+    init(urls: [String], options: ConnectionUserOptions? = nil, delegateBox: XRPLConnectionDelegateBox) {
+        self.urls = urls.filter { !$0.isEmpty }
         self.config = ConnectionOptions()
         self.config.timeout = options?.timeout ?? TIMEOUT_SECONDS
         self.config.connectionTimeout = options?.connectionTimeout ?? CONNECTION_TIMEOUT_SECONDS
@@ -391,6 +404,26 @@ public actor Connection: Sendable, WebsocketResponding {
             return
         }
 
+        guard !urls.isEmpty else {
+            throw ConnectionError("Cannot connect because no server was specified")
+        }
+
+        var lastError: Error = ConnectionError("Connection failed")
+        for _ in 0..<urls.count {
+            do {
+                try await openCurrentURL()
+                return
+            } catch {
+                lastError = error
+                let failed = url ?? ""
+                logger.warning("XRPL connect failed to \(failed, privacy: .public): \(error.localizedDescription)")
+                advanceURL()
+            }
+        }
+        throw lastError
+    }
+
+    private func openCurrentURL() async throws {
         guard let url = url else {
             throw ConnectionError("Cannot connect because no server was specified")
         }
@@ -428,6 +461,12 @@ public actor Connection: Sendable, WebsocketResponding {
                 }
             }
         }
+    }
+
+    private func advanceURL() {
+        guard urls.count > 1 else { return }
+        urlIndex = (urlIndex + 1) % urls.count
+        logger.info("XRPL failover URL now \(self.url ?? "", privacy: .public)")
     }
 
     private func finishUpgrade(_ ws: WebSocket) {
@@ -476,6 +515,7 @@ public actor Connection: Sendable, WebsocketResponding {
 
         logger.warning("XRPL websocket disconnected (\(reason), code=\(code ?? -1)). Reconnecting.")
         notifyFailure(DisconnectedError("websocket was closed, \(reason)"))
+        advanceURL()
         scheduleReconnect()
     }
 
