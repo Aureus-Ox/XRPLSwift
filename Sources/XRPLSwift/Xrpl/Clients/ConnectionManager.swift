@@ -64,11 +64,6 @@ public class ConnectionManager {
     public func awaitConnection() async -> EventLoopFuture<Any> {
         let eventLoop = eventGroup.next()
         let promise = eventLoop.makePromise(of: Any.self)
-    
-        eventLoop.scheduleTask(in: .seconds(2)) {
-            promise.fail(TimeoutError("Connection timeout", nil))
-        }
-
         self.promisesAwaitingConnection.append(promise)
         return promise.futureResult
     }

@@ -156,6 +156,13 @@ public class XrplClient: ConnectionDelegate {
      * Underlying connection to rippled.
      */
     public var connection: WebsocketResponding
+    private let connectionDelegateBox: XRPLConnectionDelegateBox
+
+    /// Observe connect / reconnect / disconnect. Callbacks arrive on the main actor.
+    public weak var connectionDelegate: XRPLConnectionDelegate? {
+        get { connectionDelegateBox.delegate }
+        set { connectionDelegateBox.delegate = newValue }
+    }
 
     /**
      * Factor to multiply estimated fee by to provide a cushion in case the
@@ -181,13 +188,24 @@ public class XrplClient: ConnectionDelegate {
      * @category Constructor
      */
     // eslint-disable-next-line max-lines-per-function -- okay because we have to set up all the connection handlers
-    public init(server: String, options: ClientOptions? = nil) throws {
-        if server.isValidWss {
+    public init(server: String, fallbackServers: [String] = [], options: ClientOptions? = nil) throws {
+        if !isValidRippledWebsocketURL(server) {
             throw ValidationError("server URI must start with `wss://`, `ws://`, `wss+unix://`, or `ws+unix://`.")
         }
+        var servers = [server]
+        for fallback in fallbackServers {
+            guard isValidRippledWebsocketURL(fallback) else {
+                throw ValidationError("fallback URI must start with `wss://`, `ws://`, `wss+unix://`, or `ws+unix://`.")
+            }
+            if fallback != server {
+                servers.append(fallback)
+            }
+        }
+        let delegateBox = XRPLConnectionDelegateBox()
+        self.connectionDelegateBox = delegateBox
         self.feeCushion = options?.feeCushion ?? Double(DEFAULT_FEE_CUSHION)
         self.maxFeeXRP = options?.maxFeeXRP ?? DEFAULT_MAX_FEE_XRP
-        self.connection = Connection(url: server, options: options)
+        self.connection = Connection(urls: servers, options: options, delegateBox: delegateBox)
     }
 
     /**
@@ -616,6 +634,17 @@ public class XrplClient: ConnectionDelegate {
         return await self.connection.isConnected()
     }
 
+    /// Current lifecycle state (disconnected / connecting / connected / reconnecting).
+    public func connectionState() async -> XRPLConnectionState {
+        return await self.connection.currentState()
+    }
+
+    /// Suspends until the websocket is live, starting a connection if needed.
+    /// Apps should call this instead of polling `isConnected()`.
+    public func waitUntilConnected(timeoutSeconds: Double = 30) async throws {
+        try await self.connection.waitUntilConnected(timeoutSeconds: timeoutSeconds)
+    }
+
     //    public func autofill(transaction: Transaction, signersCount: Int? = 0) async throws -> EventLoopFuture<BaseTransaction> {
     //    let tx = try transaction.toAny() as! BaseTransaction
     public func autofill(transaction: Transaction, signersCount: Int? = 0) async throws -> EventLoopFuture<[String: AnyObject]> {
@@ -688,8 +717,9 @@ public class XrplClient: ConnectionDelegate {
 }
 
 extension String {
+    /// Historical helper. Prefer `isValidRippledWebsocketURL(_:)`.
     var isValidWss: Bool {
-        return range(of: "^[wW]{3}+.[a-zA-Z]{3,}+.[a-z]{2,}", options: .regularExpression) != nil
+        return isValidRippledWebsocketURL(self)
     }
 }
 

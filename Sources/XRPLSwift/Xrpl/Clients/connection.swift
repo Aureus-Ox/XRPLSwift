@@ -9,6 +9,7 @@
 
 import Foundation
 import NIO
+import NIOCore
 import WebSocketKit
 #if canImport(FoundationNetworking)
 import FoundationNetworking
@@ -39,8 +40,12 @@ class ConsoleLog {
 private let connEventGroup = MultiThreadedEventLoopGroup(numberOfThreads: 4)
 
 private let SECONDS_PER_MINUTE: Double = 60 // swiftlint:disable:this identifier_name
-private let TIMEOUT: Int = 20
-private let CONNECTION_TIMEOUT: Int = 5 // swiftlint:disable:this identifier_name
+/// JSON-RPC request + heartbeat interval, in seconds (xrpl.js uses 20_000 ms).
+private let TIMEOUT_SECONDS: Int = 20
+/// Initial TCP/TLS/upgrade budget, in seconds.
+private let CONNECTION_TIMEOUT_SECONDS: Int = 10
+/// WebSocket protocol ping interval. Keeps reverse-proxies (nginx) from dropping idle sockets.
+private let WEBSOCKET_PING_SECONDS: Int64 = 20
 
 public enum WebsocketState: String {
     case closed
@@ -61,8 +66,10 @@ public class ConnectionOptions {
     public var key: String?
     public var passphrase: String?
     public var certificate: String?
+    /// Request timeout in **seconds**.
     public var timeout: Int?
-    public var connectionTimeout: Int = 3600
+    /// Connect/upgrade timeout in **seconds**.
+    public var connectionTimeout: Int = CONNECTION_TIMEOUT_SECONDS
     public var headers: [String: [String: String]]?
 }
 
@@ -79,53 +86,6 @@ public class ConnectionUserOptions: ConnectionOptions {}
  See: https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent
  */
 public let INTENTIONAL_DISCONNECT_CODE = 4000 // swiftlint:disable:this identifier_name
-
-// typealias WebsocketState: Int = 0 | 1 | 2 | 3
-
-// func getAgent(url: String, config: ConnectionOptions) -> Agent? {
-//  if config.proxy == nil {
-//    return nil
-//  }
-//
-//  let parsedURL = URL(url)
-//    let parsedProxyURL = URL(config.proxy)
-//
-//  let proxyOptions = _.omitBy(
-//    {
-//      secureEndpoint: parsedURL.protocol === "wss:",
-//      secureProxy: parsedProxyURL.protocol === "https:",
-//      auth: config.proxyAuthorization,
-//      ca: config.trustedCertificates,
-//      key: config.key,
-//      passphrase: config.passphrase,
-//      cert: config.certificate,
-//      href: parsedProxyURL.href,
-//      origin: parsedProxyURL.origin,
-//      protocol: parsedProxyURL.protocol,
-//      username: parsedProxyURL.username,
-//      password: parsedProxyURL.password,
-//      host: parsedProxyURL.host,
-//      hostname: parsedProxyURL.hostname,
-//      port: parsedProxyURL.port,
-//      pathname: parsedProxyURL.pathname,
-//      search: parsedProxyURL.search,
-//      hash: parsedProxyURL.hash,
-//    },
-//    (value) => value == null,
-//  )
-//
-//  let HttpsProxyAgent: new (opt: typeof proxyOptions) => Agent
-//  do {
-//    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-require-imports,
-//      node/global-require, global-require, -- Necessary for the `require` */
-//    HttpsProxyAgent = require("https-proxy-agent")
-//    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-require-imports,
-//      node/global-require, global-require, */
-//  } catch (_error) {
-//    throw new Error(""proxy" option is not supported in the browser")
-//  }
-//  return new HttpsProxyAgent(proxyOptions)
-// }
 
 /**
  Create a new websocket given your URL and optional proxy/certificate configuration.
@@ -173,14 +133,23 @@ public protocol ConnectionDelegate: AnyObject {
     func pathFind(path: Any)
 }
 
+@preconcurrency
 public protocol WebsocketResponding: AnyObject {
     func isConnected() async -> Bool
     func connect() async throws -> EventLoopFuture<Any>
     func disconnect() async -> EventLoopFuture<Any?>
     func reconnect() async throws
+    func waitUntilConnected(timeoutSeconds: Double) async throws
+    func currentState() async -> XRPLConnectionState
 
     func request<R: BaseRequest>(request: R, timeout: Int?) async throws -> EventLoopFuture<Any>
     func getUrl() async -> String
+}
+
+private struct ConnectionWaiter {
+    let id: UUID
+    let continuation: CheckedContinuation<Void, Error>
+    let timeoutTask: Task<Void, Never>
 }
 
 /**
@@ -190,10 +159,13 @@ public protocol WebsocketResponding: AnyObject {
 public actor Connection: Sendable, WebsocketResponding {
     var trace: ConsoleLog?
 
-    let url: String?
+    let urls: [String]
+    private var urlIndex: Int = 0
+    var url: String? {
+        guard !urls.isEmpty else { return nil }
+        return urls[urlIndex]
+    }
     var ws: WebSocket?
-    private var reconnectTimeoutID: Timer?
-    private var heartbeatIntervalID: Timer?
     private let retryConnectionBackoff = ExponentialBackoff(
         opts: ExponentialBackoffOptions(min: 0.1, max: SECONDS_PER_MINUTE)
     )
@@ -206,6 +178,20 @@ public actor Connection: Sendable, WebsocketResponding {
         category: String(describing: Connection.self)
     )
 
+    private let delegateBox: XRPLConnectionDelegateBox
+
+    /// Client wants a live socket. Cleared only by `disconnect()`.
+    private var wantsConnection: Bool = false
+    /// True while a close was requested by `disconnect()` / `reconnect()`.
+    private var intentionalClose: Bool = false
+    private var connectionState: XRPLConnectionState = .disconnected
+    private var inFlightConnect: EventLoopPromise<Any>?
+    private var reconnectTask: Task<Void, Never>?
+    private var heartbeatTask: Task<Void, Never>?
+    private var upgradeTimeoutTask: Task<Void, Never>?
+    private var stateWaiters: [ConnectionWaiter] = []
+    private var upgradeContinuation: CheckedContinuation<Void, Error>?
+
     /**
      Creates a new Connection object.
      - parameters:
@@ -213,23 +199,38 @@ public actor Connection: Sendable, WebsocketResponding {
      - options: Options for the Connection object.
      */
     public init(url: String?, options: ConnectionUserOptions? = nil) {
-        //    super()
-        //        ws.setMaxListeners(1000000)
-        self.url = url
+        self.init(urls: url.map { [$0] } ?? [], options: options, delegateBox: XRPLConnectionDelegateBox())
+    }
+
+    public init(urls: [String], options: ConnectionUserOptions? = nil) {
+        self.init(urls: urls, options: options, delegateBox: XRPLConnectionDelegateBox())
+    }
+
+    init(url: String?, options: ConnectionUserOptions? = nil, delegateBox: XRPLConnectionDelegateBox) {
+        self.init(urls: url.map { [$0] } ?? [], options: options, delegateBox: delegateBox)
+    }
+
+    init(urls: [String], options: ConnectionUserOptions? = nil, delegateBox: XRPLConnectionDelegateBox) {
+        self.urls = urls.filter { !$0.isEmpty }
         self.config = ConnectionOptions()
-        self.config.timeout = TIMEOUT * 1000
-        self.config.connectionTimeout = CONNECTION_TIMEOUT * 1000
-        //        self.config = {
-        //            self.timeout: TIMEOUT * 1000,
-        //        connectionTimeout: CONNECTION_TIMEOUT * 1000,
-        //            ...options,
-        //        }
-        //        if (typeof options.trace === "function") {
-        //            self.trace = options.trace
-        //        } else if (options.trace) {
-        //            // eslint-disable-next-line no-console -- Used for tracing only
-        //            self.trace = console.log
-        //        }
+        self.config.timeout = options?.timeout ?? TIMEOUT_SECONDS
+        self.config.connectionTimeout = options?.connectionTimeout ?? CONNECTION_TIMEOUT_SECONDS
+        self.config.proxy = options?.proxy
+        self.config.authorization = options?.authorization
+        self.config.trustedCertificates = options?.trustedCertificates
+        self.config.key = options?.key
+        self.config.passphrase = options?.passphrase
+        self.config.certificate = options?.certificate
+        self.config.headers = options?.headers
+        self.delegateBox = delegateBox
+    }
+
+    func setConnectionDelegate(_ delegate: XRPLConnectionDelegate?) {
+        delegateBox.delegate = delegate
+    }
+
+    public func currentState() async -> XRPLConnectionState {
+        return connectionState
     }
 
     /**
@@ -237,98 +238,50 @@ public actor Connection: Sendable, WebsocketResponding {
      - returns:
      Whether the websocket connection is open.
      */
-    public func isConnected() -> Bool {
-        return self.ws?.isClosed == false
+    public func isConnected() async -> Bool {
+        return hasLiveSocket()
+    }
+
+    private func hasLiveSocket() -> Bool {
+        return socketIsOpen() && connectionState == .connected
     }
 
     /**
      Connects the websocket to the provided URL.
-     - returns:
-     When the websocket is connected.
-     - throws:
-     ConnectionError if there is a connection error, RippleError if there is already a WebSocket in existence.
+     Waits until the socket is open and handlers are attached (or fails).
+     Idempotent: already-connected returns immediately; in-flight joins the same attempt.
+     After the first successful `connect()`, unexpected drops auto-reconnect until `disconnect()`.
      */
     public func connect() async throws -> EventLoopFuture<Any> {
-        
-        //        let promise = connEventGroup.next().makePromise(of: Any.self)
-        //        if self.isConnected() {
-        //            return promise.futureResult
-        //          }
-        //        if self.state == .closed {
-        //            return await self.connectionManager.awaitConnection()
-        //        }
-        //        if self.url!.isEmpty {
-        //            promise.fail(XrplError("Cannot connect because no server was specified"))
-        //        }
-        //        if self.ws != nil {
-        //            // missing state
-        //            promise.fail(XrplError("Websocket connection never cleaned up."))
-        //        }
-        guard !connectionManager.hasAwaitingConnection() else {
-            throw ConnectionError("Awaiting connection")
+        wantsConnection = true
+
+        if hasLiveSocket() {
+            return succeededFuture()
         }
 
-        // Create the connection timeout, in case the connection hangs longer than expected.
-        // Connection listeners: these stay attached only until a connection is done/open.
-        guard let url = url, let uri = URL(string: url), let isscheme = uri.scheme, let ishost = uri.host else {
-            throw ConnectionError("Connection: invalid url")
+        if let inFlight = inFlightConnect {
+            try await inFlight.futureResult.get()
+            return inFlight.futureResult
         }
 
-        var port = uri.port
-        if port == nil {
-            // wss:
-            port = 443
-            
-            if isscheme == "ws" {
-                port = 80
+        let promise = connEventGroup.next().makePromise(of: Any.self)
+        inFlightConnect = promise
+        setState(.connecting)
+
+        do {
+            try await openSocket()
+            promise.succeed("")
+            inFlightConnect = nil
+            return promise.futureResult
+        } catch {
+            promise.fail(error)
+            inFlightConnect = nil
+            notifyFailure(error)
+            if wantsConnection {
+                scheduleReconnect()
             }
+            throw error
         }
-        
-        guard let port = port else {
-            throw ConnectionError("Connection: invalid port")
-        }
-
-        guard let client: WebSocketClient = createWebSocket(url: url) else {
-            throw ConnectionError("Failed to create client")
-        }
-
-        let connectionLoopFuture = client.connect(scheme: isscheme, host: ishost, port: port, onUpgrade: { ws -> Void in
-            Task {
-                await self.setWebSocket(ws: ws)
-                await self.setHandlers()
-
-                if await self.ws == nil {
-                    await self.connectionManager.rejectAllAwaiting(error: ConnectionError("Connect: created null websocket"))
-                    throw ConnectionError("Connect: created null websocket")
-                }
-
-                await self.retryConnectionBackoff.reset()
-                await self.startHeartbeatInterval()
-                await self.connectionManager.resolveAllAwaiting()
-
-                NSLog("connected")
-            }
-        })
-
-        //        this.ws.on('error', (error) => this.onConnectionFailed(error))
-        //        this.ws.on('error', () => clearTimeout(connectionTimeoutID))
-
-        connectionLoopFuture.whenFailure { error in
-            NSLog("connection failed: \(error)")
-            Task {
-                await self.connectionManager.rejectAllAwaiting(error: error)
-            }
-        }
-        
-        connectionLoopFuture.whenSuccess {
-            NSLog("xrpl connection success")
-            Task {
-                await self.connectionManager.resolveAllAwaiting()
-            }
-        }
-
-        try await connectionLoopFuture.get()
-        return await self.connectionManager.awaitConnection()
     }
 
     /**
@@ -341,36 +294,29 @@ public actor Connection: Sendable, WebsocketResponding {
      A promise containing either `undefined` or a disconnected code, that resolves when the connection is destroyed.
      */
     public func disconnect() async -> EventLoopFuture<Any?> {
+        wantsConnection = false
+        intentionalClose = true
+        clearHeartbeat()
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        upgradeTimeoutTask?.cancel()
+        upgradeTimeoutTask = nil
+        retryConnectionBackoff.reset()
+
+        await connectionManager.rejectAllAwaiting(error: ConnectionError("Disconnection requested"))
+        failStateWaiters(ConnectionError("Disconnection requested"))
+
         let promise = connEventGroup.next().makePromise(of: Any?.self)
-        self.clearHeartbeatInterval()
-
-        if self.reconnectTimeoutID != nil {
-            self.reconnectTimeoutID?.invalidate()
-            self.reconnectTimeoutID = nil
-        }
-        if self.state == WebsocketState.closed {
+        if ws == nil {
+            setState(.disconnected)
             promise.succeed(nil)
-        }
-        if self.ws == nil {
-            promise.succeed(nil)
+            return promise.futureResult
         }
 
-        if self.ws == nil {
-            promise.succeed(nil)
-        }
-        if self.ws != nil {
-            promise.succeed(1000)
-        }
-        /*
-         * Connection already has a disconnect handler for the disconnect logic.
-         * Just close the websocket manually (with our "intentional" code) to
-         * trigger that.
-         */
-        if self.ws != nil && self.state != WebsocketState.closing {
-            _ = try? await self.ws?.close(code: .normalClosure)
-        }
-
-        await self.connectionManager.rejectAllAwaiting(error: ConnectionError("Disconnection requested"))
+        promise.succeed(1000)
+        _ = try? await ws?.close(code: .normalClosure)
+        ws = nil
+        setState(.disconnected)
         return promise.futureResult
     }
 
@@ -378,38 +324,64 @@ public actor Connection: Sendable, WebsocketResponding {
      Disconnect the websocket, then connect again.
      */
     public func reconnect() async throws {
-        /*
-         * NOTE: We currently have a "reconnecting" event, but that only triggers
-         * through an unexpected connection retry logic.
-         * See: https://github.com/XRPLF/xrpl.js/pull/1101#issuecomment-565360423
-         */
-        //        self.emit("reconnect")
-        _ = try await self.disconnect().get()
-        _ = try await self.connect().get()
+        wantsConnection = true
+        intentionalClose = true
+        clearHeartbeat()
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        _ = try? await ws?.close(code: .normalClosure)
+        ws = nil
+        _ = try await connect().get()
+    }
+
+    public func waitUntilConnected(timeoutSeconds: Double = 30) async throws {
+        if hasLiveSocket() { return }
+        if !wantsConnection {
+            _ = try await connect()
+            return
+        }
+        if hasLiveSocket() { return }
+
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            let id = UUID()
+            let timeoutTask = Task {
+                let ns = UInt64(max(timeoutSeconds, 0.05) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: ns)
+                await self.timeoutWaiter(id)
+            }
+            stateWaiters.append(ConnectionWaiter(id: id, continuation: cont, timeoutTask: timeoutTask))
+        }
     }
 
     /**
      Sends a request to the rippled server.
-     - parameters:
-     - request: The request to send to the server.
-     - timeout: How long the Connection instance should wait before assuming that there will not be a response.
-     - returns:
-     The response from the rippled server.
-     - throws:
-     NotConnectedError if the Connection isn"t connected to a server.
+     If the client previously called `connect()` and the socket is temporarily down,
+     this waits for reconnect rather than immediately throwing `NotConnectedError`.
      */
     public func request<R: BaseRequest>(
         request: R,
         timeout: Int? = nil
     ) async throws -> EventLoopFuture<Any> {
-        guard self.shouldBeConnected, let ws = self.ws else {
+        if !socketIsOpen() {
+            if wantsConnection {
+                try await waitUntilConnected(timeoutSeconds: Double(timeout ?? config.timeout ?? TIMEOUT_SECONDS))
+            }
+        }
+        guard socketIsOpen(), let ws = self.ws else {
             throw NotConnectedError("Not Connected")
         }
 
-        let (_, message, responsePromise) = try self.requestManager.createRequest(
+        let timeoutSeconds = timeout ?? self.config.timeout ?? TIMEOUT_SECONDS
+        let (id, message, responsePromise) = try self.requestManager.createRequest(
             request: request,
-            timeout: timeout ?? self.config.timeout ?? 10
+            timeout: timeoutSeconds
         )
+
+        Task {
+            let ns = UInt64(timeoutSeconds) * 1_000_000_000
+            try? await Task.sleep(nanoseconds: ns)
+            await self.timeoutRequest(id: id)
+        }
 
         _ = await websocketSendAsync(ws: ws, message: message)
         return responsePromise
@@ -420,9 +392,192 @@ public actor Connection: Sendable, WebsocketResponding {
      - returns:
      The Websocket connection URL.
      */
-    public func getUrl() -> String {
+    public func getUrl() async -> String {
         return self.url ?? ""
     }
+
+    // MARK: - Socket open / close
+
+    private func openSocket() async throws {
+        if socketIsOpen() {
+            setState(.connected)
+            return
+        }
+
+        guard !urls.isEmpty else {
+            throw ConnectionError("Cannot connect because no server was specified")
+        }
+
+        var lastError: Error = ConnectionError("Connection failed")
+        for _ in 0..<urls.count {
+            do {
+                try await openCurrentURL()
+                return
+            } catch {
+                lastError = error
+                let failed = url ?? ""
+                logger.warning("XRPL connect failed to \(failed, privacy: .public): \(error.localizedDescription)")
+                advanceURL()
+            }
+        }
+        throw lastError
+    }
+
+    private func openCurrentURL() async throws {
+        guard let url = url else {
+            throw ConnectionError("Cannot connect because no server was specified")
+        }
+        let endpoint = try parseWebsocketURL(url)
+
+        guard let client = createWebSocket(url: url) else {
+            throw ConnectionError("Failed to create client")
+        }
+
+        let connectTimeout = config.connectionTimeout
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            self.upgradeContinuation = cont
+            self.upgradeTimeoutTask?.cancel()
+            self.upgradeTimeoutTask = Task {
+                let ns = UInt64(connectTimeout) * 1_000_000_000
+                try? await Task.sleep(nanoseconds: ns)
+                await self.failUpgrade(TimeoutError("Connection timeout", nil))
+            }
+
+            let future = client.connect(
+                scheme: endpoint.scheme,
+                host: endpoint.host,
+                port: endpoint.port,
+                path: endpoint.path,
+                onUpgrade: { ws in
+                    Task {
+                        await self.finishUpgrade(ws)
+                    }
+                }
+            )
+
+            future.whenFailure { error in
+                Task {
+                    await self.failUpgrade(error)
+                }
+            }
+        }
+    }
+
+    private func advanceURL() {
+        guard urls.count > 1 else { return }
+        urlIndex = (urlIndex + 1) % urls.count
+        logger.info("XRPL failover URL now \(self.url ?? "", privacy: .public)")
+    }
+
+    private func finishUpgrade(_ ws: WebSocket) {
+        guard let cont = upgradeContinuation else {
+            // Upgrade after timeout/cancel — drop the extra socket.
+            _ = ws.close()
+            return
+        }
+        upgradeContinuation = nil
+        upgradeTimeoutTask?.cancel()
+        upgradeTimeoutTask = nil
+        self.ws = ws
+        intentionalClose = false
+        setHandlers()
+        ws.pingInterval = .seconds(WEBSOCKET_PING_SECONDS)
+        retryConnectionBackoff.reset()
+        startHeartbeat()
+        setState(.connected)
+        Task {
+            await self.connectionManager.resolveAllAwaiting()
+        }
+        resumeWaitersSuccess()
+        logger.info("XRPL websocket connected to \(self.url ?? "", privacy: .public)")
+        cont.resume()
+    }
+
+    private func failUpgrade(_ error: Error) {
+        guard let cont = upgradeContinuation else { return }
+        upgradeContinuation = nil
+        upgradeTimeoutTask?.cancel()
+        upgradeTimeoutTask = nil
+        ws = nil
+        cont.resume(throwing: error)
+    }
+
+    private func handleUnexpectedDisconnect(reason: String, code: Int?) {
+        clearHeartbeat()
+        try? requestManager.rejectAll(error: DisconnectedError("websocket was closed, \(reason)"))
+        ws = nil
+
+        if intentionalClose || !wantsConnection {
+            intentionalClose = false
+            setState(.disconnected)
+            return
+        }
+
+        logger.warning("XRPL websocket disconnected (\(reason), code=\(code ?? -1)). Reconnecting.")
+        notifyFailure(DisconnectedError("websocket was closed, \(reason)"))
+        advanceURL()
+        scheduleReconnect()
+    }
+
+    private func scheduleReconnect() {
+        guard wantsConnection else { return }
+        guard reconnectTask == nil else { return }
+
+        let delay = retryConnectionBackoff.duration()
+        let attempt = retryConnectionBackoff.attempts()
+        setState(.reconnecting(attempt: attempt))
+        logger.info("XRPL reconnect attempt \(attempt) in \(delay)s")
+
+        reconnectTask = Task {
+            let ns = UInt64(max(delay, 0.05) * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: ns)
+            await self.runScheduledReconnect()
+        }
+    }
+
+    private func runScheduledReconnect() async {
+        reconnectTask = nil
+        guard wantsConnection, !hasLiveSocket(), !Task.isCancelled else { return }
+        do {
+            _ = try await connect()
+        } catch {
+            // `connect()` schedules the next attempt on failure.
+        }
+    }
+
+    // MARK: - Heartbeat
+
+    private func clearHeartbeat() {
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
+    }
+
+    private func startHeartbeat() {
+        clearHeartbeat()
+        let interval = UInt64((config.timeout ?? TIMEOUT_SECONDS) * 1_000_000_000)
+        heartbeatTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: interval)
+                if Task.isCancelled { break }
+                await self.sendHeartbeat()
+            }
+        }
+    }
+
+    private func sendHeartbeat() async {
+        guard wantsConnection, socketIsOpen() else { return }
+        do {
+            let response = try await request(request: PingRequest(), timeout: min(10, config.timeout ?? TIMEOUT_SECONDS))
+            _ = try await response.get()
+        } catch {
+            logger.warning("XRPL heartbeat ping failed: \(error.localizedDescription)")
+            if wantsConnection {
+                handleUnexpectedDisconnect(reason: "heartbeat failed", code: nil)
+            }
+        }
+    }
+
+    // MARK: - Messages
 
     /**
      Handler for when messages are received from the server.
@@ -434,35 +589,17 @@ public actor Connection: Sendable, WebsocketResponding {
         do {
             dict = try JSONSerialization.jsonObject(with: data, options: .mutableLeaves) as! [String: AnyObject]
         } catch {
-            print(error.localizedDescription)
-            //            if (error instanceof Error) {
-            //                self.emit("error", "badMessage", error.message, message)
-            //            }
+            logger.warning("XRPL bad websocket message: \(error.localizedDescription)")
             return
         }
-        //        guard let br = br else {
-        //            return
-        //        }
-        //        if br.type == nil && br.error != nil {
-        //            // e.g. slowDown
-        ////            self.emit("error", data.error, data.error_message, data)
-        //            return
-        //        }
-        //        if (br.type.isEmpty) {
-        //            // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Should be true
-        ////            self.emit(data.type as string, data)
-        //        }
-        if dict["type"] as! String == "response" {
+        guard let type = dict["type"] as? String else {
+            return
+        }
+        if type == "response" {
             do {
                 try self.requestManager.handleResponse(response: dict)
             } catch {
-                print(error)
-                // eslint-disable-next-line max-depth -- okay here
-                //                if (error instanceof Error) {
-                //                    self.emit("error", "badMessage", error.message, message)
-                //                } else {
-                //                    self.emit("error", "badMessage", error, error)
-                //                }
+                logger.warning("XRPL response handling failed: \(error.localizedDescription)")
             }
         }
     }
@@ -474,7 +611,6 @@ public actor Connection: Sendable, WebsocketResponding {
      */
     private func onMessage(message: String) {
         guard let data: Data = message.data(using: .utf8) else {
-            // Fail silently
             logger.warning("Failed to parse message as UTF-8: \(message)")
             return
         }
@@ -487,7 +623,7 @@ public actor Connection: Sendable, WebsocketResponding {
      The Websocket"s ready state.
      */
     private var state: WebsocketState {
-        return self.ws != nil ? WebsocketState.open : WebsocketState.closed
+        return socketIsOpen() ? WebsocketState.open : WebsocketState.closed
     }
 
     /**
@@ -496,21 +632,16 @@ public actor Connection: Sendable, WebsocketResponding {
      Whether the server should be connected.
      */
     private var shouldBeConnected: Bool {
-        return self.ws != nil
+        return wantsConnection
     }
 
     private func setWebSocket(ws: WebSocket?) {
         self.ws = ws
     }
-    
+
     private func socketIsOpen() -> Bool {
         guard let ws = ws else { return false }
-        
-        if ws.isClosed {
-            return false
-        }
-        
-        return true
+        return !ws.isClosed
     }
 
     private func setHandlers() {
@@ -523,148 +654,73 @@ public actor Connection: Sendable, WebsocketResponding {
             await self.onMessage(data: data)
         })
 
-        // Handle a closed connection: reconnect if it was unexpected
-        _ = self.ws?.onClose.map { error in
-            
-            // TODO: - THIS REASON AND CODE ARENT SET FROM ANYWHERE. FIGURE OUT WHAT TO DO HERE
-            var reason: String = "none"
-            var code: Int = 0
-            
-            NSLog("XRPL ON CLOSE \(error)")
-            
-            Task { [weak self] in
-                guard let self else { return }
-                
-                NSLog("XRPL WEBSOCKET CLOSE CODE \(await self.ws?.closeCode)")
-
-                if await socketIsOpen() {
-                    NSLog("UNMPLEMENTED")
-                    return
-                }
-                await clearHeartbeatInterval()
-                try? await requestManager.rejectAll(error: DisconnectedError("websocket was closed, \(reason)"))
-
-                await self.setWebSocket(ws: nil)
-                await self.connectionManager.resolveAllAwaiting()
-
-                logger.warning("Websocket disconnected with code \(String(describing: code)): \(reason)")
-                
-
-                /*
-                 * If this wasn"t a manual disconnect, then lets reconnect ASAP.
-                 * Code can be undefined if there"s an exception while connecting.
-                 *
-                 * NOTE: This doesn't do anything since the error code is never set
-                 */
-                if code != INTENTIONAL_DISCONNECT_CODE {
-                    await self.intentionalDisconnect()
-                }
-            }
-        }
-    }
-
-    /**
-     Handler for what to do once the connection to the server is open.
-     - parameters:
-     - connectionTimeoutID: Timeout in case the connection hangs longer than expected.
-     - returns:
-     A promise that resolves to void when the connection is fully established.
-     - throws:
-     Error if the websocket initialized is somehow null.
-     */
-    private func intentionalDisconnect() {
-        let retryTimeout = self.retryConnectionBackoff.duration()
-        //            self.trace("reconnect", "Retrying connection in \(retryTimeout)ms.")
-        //            self.emit("reconnecting", self.retryConnectionBackoff.attempts)
-        logger.log("reconnecting: \(String(describing: self.retryConnectionBackoff.attempts)))")
-        /*
-         * Start the reconnect timeout, but set it to `this.reconnectTimeoutID`
-         * so that we can cancel one in-progress on disconnect.
-         */
-        self.reconnectTimeoutID = Timer.scheduledTimer(withTimeInterval: retryTimeout, repeats: false) { _ in
+        _ = self.ws?.onClose.always { result in
             Task {
-                NSLog("XRPL RECONNECT")
-                try await self.reconnect()
-            }
-        }
-    }
-
-    /**
-     Clears the heartbeat connection interval.
-     */
-    private func clearHeartbeatInterval() {
-        if self.heartbeatIntervalID != nil {
-            self.heartbeatIntervalID?.invalidate()
-        }
-    }
-
-    /**
-     Starts a heartbeat to check the connection with the server.
-     */
-    private func startHeartbeatInterval() {
-        self.clearHeartbeatInterval()
-        self.heartbeatIntervalID = Timer.scheduledTimer(withTimeInterval: TimeInterval(self.config.timeout!), repeats: false) { _ in
-            Task {
-                await self.heartbeat()
-            }
-        }
-    }
-
-    /**
-     A heartbeat is just a "ping" command, sent on an interval.
-     If this succeeds, we"re good. If it fails, disconnect so that the consumer can reconnect, if desired.
-     - returns:
-     A Promise that resolves to void when the heartbeat returns successfully.
-     */
-    private func heartbeat() async -> EventLoopPromise<Void> {
-        let promise = connEventGroup.next().makePromise(of: Void.self)
-        let response = try! await self.request(request: BaseRequest(command: "ping"))
-        response.whenFailure { error in
-            Task {
-                do {
-                    try await self.reconnect()
-                } catch {
-                    //                    self.emit("error", "reconnect", error.message, error)
-                    NSLog("error: reconnect: \(error.localizedDescription)")
+                let reason: String
+                switch result {
+                case .success:
+                    reason = "close"
+                case .failure(let error):
+                    reason = error.localizedDescription
                 }
+                await self.handleUnexpectedDisconnect(reason: reason, code: nil)
             }
         }
-        return promise
     }
 
-    /**
-     Process a failed connection.
-     - parameters:
-     - errorOrCode: (Optional) Error or code for connection failure.
-     */
-    private func onConnectionFailed(errorOrCode: Error) async {
-        if self.ws != nil {
-            //            self.ws.removeAllListeners()
-            _ = try? await self.ws?.close()
-            self.ws = nil
+    // MARK: - Waiters / notify
+
+    private func setState(_ state: XRPLConnectionState) {
+        guard connectionState != state else { return }
+        connectionState = state
+        let box = delegateBox
+        Task { @MainActor in
+            box.delegate?.xrplConnection(didChangeState: state)
         }
-        if !errorOrCode.localizedDescription.isEmpty {
-            //            self.connectionManager.rejectAllAwaiting(error: NotConnectedError.connection(errorOrCode.localizedDescription, errorOrCode))
-            await self.connectionManager.rejectAllAwaiting(error: NotConnectedError(errorOrCode.localizedDescription))
-        } else {
-            await self.connectionManager.rejectAllAwaiting(error: NotConnectedError("Connection failed."))
+        if state == .connected {
+            resumeWaitersSuccess()
         }
     }
 
-    /**
-     Process a failed connection.
-     - parameters:
-     - errorOrCode: (Optional) Error or code for connection failure.
-     */
-    private func onConnectionFailed(errorOrCode: Int) async {
-        if self.ws != nil {
-            //            self.ws.removeAllListeners()
-            _ = try? await self.ws?.close()
-            self.ws = nil
+    private func notifyFailure(_ error: Error) {
+        let box = delegateBox
+        Task { @MainActor in
+            box.delegate?.xrplConnection(didFailWithError: error)
         }
-        await self.connectionManager.rejectAllAwaiting(
-            //            error: NotConnectedError("Connection failed with code \(errorOrCode).", code: errorOrCode),
-            error: NotConnectedError("Connection failed with code \(errorOrCode).")
-        )
+    }
+
+    private func resumeWaitersSuccess() {
+        let waiters = stateWaiters
+        stateWaiters.removeAll()
+        for waiter in waiters {
+            waiter.timeoutTask.cancel()
+            waiter.continuation.resume()
+        }
+    }
+
+    private func failStateWaiters(_ error: Error) {
+        let waiters = stateWaiters
+        stateWaiters.removeAll()
+        for waiter in waiters {
+            waiter.timeoutTask.cancel()
+            waiter.continuation.resume(throwing: error)
+        }
+    }
+
+    private func timeoutWaiter(_ id: UUID) {
+        guard let index = stateWaiters.firstIndex(where: { $0.id == id }) else { return }
+        let waiter = stateWaiters.remove(at: index)
+        waiter.timeoutTask.cancel()
+        waiter.continuation.resume(throwing: TimeoutError("Connection timeout", nil))
+    }
+
+    private func timeoutRequest(id: Int) {
+        try? requestManager.reject(id: id, error: TimeoutError("Timeout Error"))
+    }
+
+    private func succeededFuture() -> EventLoopFuture<Any> {
+        let promise = connEventGroup.next().makePromise(of: Any.self)
+        promise.succeed("")
+        return promise.futureResult
     }
 }
